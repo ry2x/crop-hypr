@@ -16,7 +16,7 @@ use super::overlay::{MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
 
-#[iced_layershell::to_layer_message]
+#[iced_layershell::to_layer_message(multi)]
 #[derive(Debug, Clone)]
 pub enum Message {
     ModeSelected(CaptureMode),
