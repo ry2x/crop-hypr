@@ -1,7 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use iced::{
-    Element, Length, Point, Rectangle, Subscription, Task, Theme,
+    ContentFit, Element, Length, Point, Rectangle, Subscription, Task, Theme,
     event::listen_with,
     keyboard::{Event as KeyEvent, Key, key::Named},
     mouse,
@@ -230,11 +233,14 @@ impl canvas::Program<Message> for SelectionCanvas {
 
 pub struct AppState {
     pub mode: CaptureMode,
-    pub screenshot: image::Handle,
+    /// One pre-decoded image handle per monitor (indexed same as `monitors`)
+    pub monitor_images: Vec<image::Handle>,
+    /// Index into `monitors` for the focused (initial) window
+    pub focused_monitor_idx: usize,
+    /// Maps extra window IDs (spawned at boot) → monitor index
+    pub window_to_monitor: HashMap<iced::window::Id, usize>,
     pub windows: Vec<WindowInfo>,
     pub monitors: Vec<MonitorInfo>,
-    /// Global pixel origin of the focused monitor (used for coordinate mapping).
-    pub monitor_offset: Point,
     /// None        = cancelled (ESC, never set)
     /// Some(None)  = "All" selected (use full screenshot)
     /// Some(Some)  = region selected
@@ -243,26 +249,20 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(
-        screenshot: image::Handle,
+        monitor_images: Vec<image::Handle>,
+        focused_monitor_idx: usize,
+        window_to_monitor: HashMap<iced::window::Id, usize>,
         windows: Vec<WindowInfo>,
         monitors: Vec<MonitorInfo>,
         result: Arc<Mutex<Option<Option<ScreenRect>>>>,
     ) -> Self {
-        let monitor_offset = monitors
-            .iter()
-            .find(|m| m.focused)
-            .map(|m| Point {
-                x: m.rect.x as f32,
-                y: m.rect.y as f32,
-            })
-            .unwrap_or(Point::ORIGIN);
-
         Self {
             mode: CaptureMode::Crop,
-            screenshot,
+            monitor_images,
+            focused_monitor_idx,
+            window_to_monitor,
             windows,
             monitors,
-            monitor_offset,
             result,
         }
     }
@@ -289,20 +289,36 @@ impl AppState {
         Task::none()
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    /// Build the view for a specific window.
+    /// Looks up which monitor that window is on (defaults to focused monitor)
+    /// so the correct image slice and coordinate offset are used.
+    pub fn view_for_window(&self, window_id: iced::window::Id) -> Element<'_, Message> {
+        let mon_idx = self
+            .window_to_monitor
+            .get(&window_id)
+            .copied()
+            .unwrap_or(self.focused_monitor_idx);
+
+        let monitor = &self.monitors[mon_idx];
+        let monitor_offset = Point {
+            x: monitor.rect.x as f32,
+            y: monitor.rect.y as f32,
+        };
+
         let canvas_prog = SelectionCanvas {
             mode: self.mode,
             windows: self.windows.clone(),
             monitors: self.monitors.clone(),
-            monitor_offset: self.monitor_offset,
+            monitor_offset,
         };
 
         let toolbar = self.toolbar();
 
         stack![
-            Image::new(self.screenshot.clone())
+            Image::new(self.monitor_images[mon_idx].clone())
                 .width(Length::Fill)
-                .height(Length::Fill),
+                .height(Length::Fill)
+                .content_fit(ContentFit::Fill),
             Canvas::new(canvas_prog)
                 .width(Length::Fill)
                 .height(Length::Fill),
@@ -502,8 +518,8 @@ pub fn app_update(state: &mut AppState, msg: Message) -> Task<Message> {
     state.update(msg)
 }
 
-pub fn app_view(state: &AppState, _window: iced::window::Id) -> iced::Element<'_, Message> {
-    state.view()
+pub fn app_view(state: &AppState, window: iced::window::Id) -> iced::Element<'_, Message> {
+    state.view_for_window(window)
 }
 
 pub fn app_subscription(state: &AppState) -> Subscription<Message> {

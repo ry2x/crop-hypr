@@ -11,6 +11,7 @@ use iced_layershell::{
 };
 use overlay::ScreenRect;
 use std::{
+    collections::HashMap,
     path::PathBuf,
     process::Command,
     sync::{Arc, Mutex},
@@ -20,16 +21,16 @@ use tempfile::NamedTempFile;
 use crate::config::Config;
 
 /// Full freeze-mode flow:
-/// 1. Capture all monitors to a temp PNG
-/// 2. Load geometry info from hyprctl
-/// 3. Launch the iced_layershell overlay UI — opens on the focused monitor and
-///    spawns additional windows for every other connected monitor at boot
-/// 4. Read the selected region from the shared mutex
-/// 5. Crop the temp PNG and save to the output path
+/// 1. Capture all monitors to a single composite PNG via grim
+/// 2. Pre-decode the image and crop one handle per monitor (avoids async loading lag)
+/// 3. Launch iced_layershell daemon — initial window on focused monitor,
+///    extra windows spawned at boot for every other monitor
+/// 4. Each window renders only its monitor's slice of the screenshot
+/// 5. Crop the composite PNG to the selected region and save
 ///
 /// Returns the saved path, or `None` if the user cancelled.
 pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
-    // ── Step 1: capture full screen ──────────────────────────────────────────
+    // ── Step 1: capture all monitors into one composite PNG ──────────────────
     let tmp = NamedTempFile::with_suffix(".png").context("failed to create temp file")?;
     let tmp_path = tmp.path().to_owned();
 
@@ -41,57 +42,92 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
         anyhow::bail!("grim failed to capture screen");
     }
 
-    // ── Step 2: load geometry from hyprctl ───────────────────────────────────
+    // ── Step 2: decode image + build per-monitor handles ─────────────────────
     let windows = overlay::fetch_windows().unwrap_or_default();
     let monitors = overlay::fetch_monitors().unwrap_or_default();
 
-    // Focused monitor size for surface initialisation (daemon requires explicit size)
-    let (fw, fh) = monitors
-        .iter()
-        .find(|m| m.focused)
-        .map(|m| (m.rect.w as u32, m.rect.h as u32))
-        .unwrap_or((1920, 1080));
+    // Decode once; crop_imm is immutable so we can call it N times
+    let full_img = ::image::open(&tmp_path).context("failed to decode screenshot")?;
 
-    // Non-focused monitors need their own overlay windows spawned at boot
-    let extra_monitors: Vec<_> = monitors.iter().filter(|m| !m.focused).cloned().collect();
+    // Build a per-monitor image handle pre-decoded as RGBA bytes so iced
+    // renders it immediately (no async loading stall on first frame)
+    let monitor_images: Vec<iced_image::Handle> = monitors
+        .iter()
+        .map(|m| {
+            let x = m.rect.x.max(0) as u32;
+            let y = m.rect.y.max(0) as u32;
+            let w = (m.rect.w as u32).min(full_img.width().saturating_sub(x));
+            let h = (m.rect.h as u32).min(full_img.height().saturating_sub(y));
+            let cropped = full_img.crop_imm(x, y, w, h).into_rgba8();
+            iced_image::Handle::from_rgba(cropped.width(), cropped.height(), cropped.into_raw())
+        })
+        .collect();
+
+    // Index of the focused monitor (fallback: 0)
+    let focused_monitor_idx = monitors.iter().position(|m| m.focused).unwrap_or(0);
+
+    // Focused monitor size for daemon's required `size` field
+    let (fw, fh) = {
+        let m = &monitors[focused_monitor_idx];
+        (m.rect.w as u32, m.rect.h as u32)
+    };
 
     // ── Step 3: launch overlay UI ─────────────────────────────────────────────
-    // None        = cancelled (ESC)
-    // Some(None)  = "All" selected → use full screenshot
-    // Some(Some)  = specific region
     let result: Arc<Mutex<Option<Option<ScreenRect>>>> = Arc::new(Mutex::new(None));
 
     {
         let result_clone = result.clone();
-        let img_handle = iced_image::Handle::from_path(&tmp_path);
+
+        // Build window_to_monitor map for non-focused monitors.
+        // We create IcedIds here so we can tell app_view which monitor each window is on.
+        let mut window_to_monitor: HashMap<IcedId, usize> = HashMap::new();
+
+        // Pre-build (IcedId, settings) pairs — Task can't be cloned but these can
+        let extra_specs: Vec<(IcedId, NewLayerShellSettings)> = monitors
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| !m.focused)
+            .map(|(idx, m)| {
+                let id = IcedId::unique();
+                window_to_monitor.insert(id, idx);
+                let settings = NewLayerShellSettings {
+                    layer: Layer::Overlay,
+                    anchor: Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right,
+                    exclusive_zone: Some(-1),
+                    keyboard_interactivity: KeyboardInteractivity::Exclusive,
+                    output_option: OutputOption::OutputName(m.name.clone()),
+                    namespace: Some("crop-hypr-freeze".to_string()),
+                    ..Default::default()
+                };
+                (id, settings)
+            })
+            .collect();
+
+        let extra_specs = std::sync::Arc::new(extra_specs);
+
         let wins = windows.clone();
         let mons = monitors.clone();
 
         iced_layershell::daemon(
             move || {
+                let spawn_tasks: Vec<Task<Message>> = extra_specs
+                    .iter()
+                    .map(|(id, settings)| {
+                        Task::done(Message::NewLayerShell {
+                            settings: settings.clone(),
+                            id: *id,
+                        })
+                    })
+                    .collect();
+
                 let state = AppState::new(
-                    img_handle.clone(),
+                    monitor_images.clone(),
+                    focused_monitor_idx,
+                    window_to_monitor.clone(),
                     wins.clone(),
                     mons.clone(),
                     result_clone.clone(),
                 );
-                // Spawn an overlay window on every non-focused monitor
-                let spawn_tasks: Vec<Task<Message>> = extra_monitors
-                    .iter()
-                    .map(|m| {
-                        let id = IcedId::unique();
-                        let settings = NewLayerShellSettings {
-                            layer: Layer::Overlay,
-                            anchor: Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right,
-                            exclusive_zone: Some(-1),
-                            keyboard_interactivity: KeyboardInteractivity::Exclusive,
-                            output_option: OutputOption::OutputName(m.name.clone()),
-                            namespace: Some("crop-hypr-freeze".to_string()),
-                            ..Default::default()
-                        };
-                        Task::done(Message::NewLayerShell { settings, id })
-                    })
-                    .collect();
                 (state, Task::batch(spawn_tasks))
             },
             "crop-hypr-freeze",
@@ -104,8 +140,8 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
             anchor: Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right,
             exclusive_zone: -1,
             keyboard_interactivity: KeyboardInteractivity::Exclusive,
-            // daemon requires explicit size; compositor overrides via configure
-            // event because we anchor to all four edges
+            // daemon() requires an explicit size; compositor overrides it to the
+            // actual monitor dimensions because we anchor to all four edges
             size: Some((fw, fh)),
             ..Default::default()
         })
