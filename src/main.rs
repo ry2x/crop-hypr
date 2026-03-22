@@ -1,5 +1,6 @@
 mod capture;
 mod clipboard;
+mod freeze;
 mod notify;
 
 use anyhow::Result;
@@ -22,6 +23,8 @@ enum Commands {
     Monitor,
     /// Capture all monitors
     All,
+    /// Freeze screen and select region interactively
+    Freeze,
 }
 
 fn run() -> Result<()> {
@@ -36,6 +39,11 @@ fn run() -> Result<()> {
         Commands::Window => finish(capture::capture_window()?)?,
         Commands::Monitor => finish(capture::capture_monitor()?)?,
         Commands::All => finish(capture::capture_all()?)?,
+        Commands::Freeze => {
+            if let Some(path) = freeze::run_freeze()? {
+                finish(path)?;
+            }
+        }
     }
 
     Ok(())
