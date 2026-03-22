@@ -348,6 +348,7 @@ impl AppState {
                 .height(Length::Fill),
             Container::new(toolbar)
                 .width(Length::Fill)
+                .align_x(iced::alignment::Horizontal::Center)
                 .align_top(Length::Shrink)
                 .padding(12),
         ]
@@ -356,47 +357,41 @@ impl AppState {
 
     fn toolbar(&self) -> Element<'_, Message> {
         let btn = |label: &'static str, mode: CaptureMode, active: bool| {
-            button(Text::new(label))
+            button(Text::new(label).size(22))
                 .on_press(Message::ModeSelected(mode))
                 .style(if active {
                     button::primary
                 } else {
                     button::secondary
                 })
-                .padding([6, 14])
+                .padding([10, 18])
         };
 
         Container::new(
             Row::new()
                 .spacing(8)
-                .push(btn(
-                    "✂ Crop",
-                    CaptureMode::Crop,
-                    self.mode == CaptureMode::Crop,
-                ))
-                .push(btn(
-                    "🪟 Window",
-                    CaptureMode::Window,
-                    self.mode == CaptureMode::Window,
-                ))
-                .push(btn(
-                    "🖥 Monitor",
-                    CaptureMode::Monitor,
-                    self.mode == CaptureMode::Monitor,
-                ))
-                .push(btn("📋 All", CaptureMode::All, false)),
+                .push(btn("\u{F019F}", CaptureMode::Crop,    self.mode == CaptureMode::Crop))
+                .push(btn("\u{EB7F}", CaptureMode::Window,  self.mode == CaptureMode::Window))
+                .push(btn("\u{F0379}", CaptureMode::Monitor, self.mode == CaptureMode::Monitor))
+                .push(btn("\u{F004C}", CaptureMode::All,     false))
+                .push(
+                    button(Text::new("\u{F05AD}").size(22))
+                        .on_press(Message::Cancel)
+                        .style(button::danger)
+                        .padding([10, 18]),
+                ),
         )
         .style(|_theme| iced::widget::container::Style {
             background: Some(iced::Background::Color(iced::Color::from_rgba(
                 0.08, 0.08, 0.08, 0.85,
             ))),
             border: iced::Border {
-                radius: 10.0.into(),
+                radius: 12.0.into(),
                 ..Default::default()
             },
             ..Default::default()
         })
-        .padding([6, 12])
+        .padding([8, 14])
         .into()
     }
 
