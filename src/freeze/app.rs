@@ -24,6 +24,9 @@ use super::overlay::{MonitorInfo, ScreenRect, WindowInfo};
 pub enum Message {
     ModeSelected(CaptureMode),
     SelectionConfirmed(ScreenRect),
+    /// Fired when any window opens (including extra monitor windows).
+    /// Causes iced to call update() → triggers refresh_all() → extra windows render.
+    WindowOpened,
     Cancel,
 }
 
@@ -377,16 +380,16 @@ impl AppState {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        listen_with(|event, _status, _id| {
-            if let iced::Event::Keyboard(KeyEvent::KeyPressed {
+        listen_with(|event, _status, _id| match event {
+            iced::Event::Keyboard(KeyEvent::KeyPressed {
                 key: Key::Named(Named::Escape),
                 ..
-            }) = event
-            {
-                Some(Message::Cancel)
-            } else {
-                None
-            }
+            }) => Some(Message::Cancel),
+            // When a new layer-shell window opens (e.g. extra monitor windows spawned
+            // at boot), emit WindowOpened so that iced calls update() → which causes
+            // request_refresh_all() → which repaints all windows including the new one.
+            iced::Event::Window(iced::window::Event::Opened { .. }) => Some(Message::WindowOpened),
+            _ => None,
         })
     }
 }
