@@ -6,7 +6,7 @@ use app::{AppState, app_subscription, app_update, app_view};
 use iced::widget::image as iced_image;
 use iced_layershell::{
     reexport::{Anchor, KeyboardInteractivity, Layer},
-    settings::LayerShellSettings,
+    settings::{LayerShellSettings, StartMode},
 };
 use overlay::ScreenRect;
 use std::{
@@ -74,6 +74,7 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
             anchor: Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right,
             exclusive_zone: -1,
             keyboard_interactivity: KeyboardInteractivity::Exclusive,
+            start_mode: StartMode::AllScreens,
             ..Default::default()
         })
         .run()

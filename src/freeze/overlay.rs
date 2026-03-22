@@ -20,6 +20,7 @@ pub struct WindowInfo {
 pub struct MonitorInfo {
     pub rect: ScreenRect,
     pub name: String,
+    pub focused: bool,
 }
 
 fn hyprctl_json(cmd: &str) -> Result<serde_json::Value> {
@@ -68,9 +69,11 @@ pub fn fetch_monitors() -> Result<Vec<MonitorInfo>> {
             let w = m["width"].as_i64()? as i32;
             let h = m["height"].as_i64()? as i32;
             let name = m["name"].as_str()?.to_owned();
+            let focused = m["focused"].as_bool().unwrap_or(false);
             Some(MonitorInfo {
                 rect: ScreenRect { x, y, w, h },
                 name,
+                focused,
             })
         })
         .collect())

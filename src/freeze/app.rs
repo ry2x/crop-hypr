@@ -40,6 +40,10 @@ pub struct SelectionCanvas {
     pub mode: CaptureMode,
     pub windows: Vec<WindowInfo>,
     pub monitors: Vec<MonitorInfo>,
+    /// Global pixel origin of the monitor this overlay window is on.
+    /// Canvas coordinates are local (0,0 = top-left of this monitor).
+    /// `canvas_local = global - offset`
+    pub monitor_offset: Point,
 }
 
 // Canvas-internal mutable state
@@ -83,8 +87,12 @@ impl canvas::Program<Message> for SelectionCanvas {
                     DrawPhase::Idle => {
                         let prev = state.hovered;
                         state.hovered = match self.mode {
-                            CaptureMode::Window => hit_index(&self.windows, pos),
-                            CaptureMode::Monitor => hit_index_m(&self.monitors, pos),
+                            CaptureMode::Window => {
+                                hit_index(&self.windows, pos, self.monitor_offset)
+                            }
+                            CaptureMode::Monitor => {
+                                hit_index_m(&self.monitors, pos, self.monitor_offset)
+                            }
                             _ => None,
                         };
                         if state.hovered != prev {
@@ -127,10 +135,17 @@ impl canvas::Program<Message> for SelectionCanvas {
             canvas::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 if let DrawPhase::Cropping { start } = state.phase {
                     state.phase = DrawPhase::Idle;
-                    let rect = points_to_rect(start, state.cursor);
-                    if rect.w >= 5 && rect.h >= 5 {
+                    let local_rect = points_to_rect(start, state.cursor);
+                    if local_rect.w >= 5 && local_rect.h >= 5 {
+                        // Convert canvas-local coords to global for grim
+                        let global_rect = ScreenRect {
+                            x: local_rect.x + self.monitor_offset.x as i32,
+                            y: local_rect.y + self.monitor_offset.y as i32,
+                            w: local_rect.w,
+                            h: local_rect.h,
+                        };
                         return Some(
-                            canvas::Action::publish(Message::SelectionConfirmed(rect))
+                            canvas::Action::publish(Message::SelectionConfirmed(global_rect))
                                 .and_capture(),
                         );
                     }
@@ -167,12 +182,24 @@ impl canvas::Program<Message> for SelectionCanvas {
             }
             CaptureMode::Window => {
                 for (i, win) in self.windows.iter().enumerate() {
-                    draw_highlight(&mut frame, win.rect, state.hovered == Some(i), &win.title);
+                    draw_highlight(
+                        &mut frame,
+                        win.rect,
+                        state.hovered == Some(i),
+                        &win.title,
+                        self.monitor_offset,
+                    );
                 }
             }
             CaptureMode::Monitor => {
                 for (i, mon) in self.monitors.iter().enumerate() {
-                    draw_highlight(&mut frame, mon.rect, state.hovered == Some(i), &mon.name);
+                    draw_highlight(
+                        &mut frame,
+                        mon.rect,
+                        state.hovered == Some(i),
+                        &mon.name,
+                        self.monitor_offset,
+                    );
                 }
             }
             CaptureMode::All => {}
@@ -206,6 +233,8 @@ pub struct AppState {
     pub screenshot: image::Handle,
     pub windows: Vec<WindowInfo>,
     pub monitors: Vec<MonitorInfo>,
+    /// Global pixel origin of the focused monitor (used for coordinate mapping).
+    pub monitor_offset: Point,
     /// None        = cancelled (ESC, never set)
     /// Some(None)  = "All" selected (use full screenshot)
     /// Some(Some)  = region selected
@@ -219,11 +248,21 @@ impl AppState {
         monitors: Vec<MonitorInfo>,
         result: Arc<Mutex<Option<Option<ScreenRect>>>>,
     ) -> Self {
+        let monitor_offset = monitors
+            .iter()
+            .find(|m| m.focused)
+            .map(|m| Point {
+                x: m.rect.x as f32,
+                y: m.rect.y as f32,
+            })
+            .unwrap_or(Point::ORIGIN);
+
         Self {
             mode: CaptureMode::Crop,
             screenshot,
             windows,
             monitors,
+            monitor_offset,
             result,
         }
     }
@@ -255,6 +294,7 @@ impl AppState {
             mode: self.mode,
             windows: self.windows.clone(),
             monitors: self.monitors.clone(),
+            monitor_offset: self.monitor_offset,
         };
 
         let toolbar = self.toolbar();
@@ -369,14 +409,21 @@ fn draw_selection(frame: &mut canvas::Frame, start: Point, end: Point) {
     });
 }
 
-fn draw_highlight(frame: &mut canvas::Frame, rect: ScreenRect, hovered: bool, label: &str) {
+fn draw_highlight(
+    frame: &mut canvas::Frame,
+    rect: ScreenRect,
+    hovered: bool,
+    label: &str,
+    offset: Point,
+) {
     let (fill_a, stroke_a, stroke_w) = if hovered {
         (0.55f32, 1.0f32, 2.0f32)
     } else {
         (0.20, 0.7, 1.0)
     };
-    let x = rect.x as f32;
-    let y = rect.y as f32;
+    // Convert global → canvas-local by subtracting monitor origin
+    let x = rect.x as f32 - offset.x;
+    let y = rect.y as f32 - offset.y;
     let w = rect.w as f32;
     let h = rect.h as f32;
 
@@ -428,25 +475,24 @@ fn points_to_rect(a: Point, b: Point) -> ScreenRect {
     }
 }
 
-fn hit_index(windows: &[WindowInfo], pos: Option<Point>) -> Option<usize> {
+fn hit_index(windows: &[WindowInfo], pos: Option<Point>, offset: Point) -> Option<usize> {
     let p = pos?;
+    // Convert canvas-local cursor to global for comparison with hyprctl rects
+    let gx = p.x + offset.x;
+    let gy = p.y + offset.y;
     windows.iter().position(|w| {
         let r = w.rect;
-        p.x >= r.x as f32
-            && p.x <= (r.x + r.w) as f32
-            && p.y >= r.y as f32
-            && p.y <= (r.y + r.h) as f32
+        gx >= r.x as f32 && gx <= (r.x + r.w) as f32 && gy >= r.y as f32 && gy <= (r.y + r.h) as f32
     })
 }
 
-fn hit_index_m(monitors: &[MonitorInfo], pos: Option<Point>) -> Option<usize> {
+fn hit_index_m(monitors: &[MonitorInfo], pos: Option<Point>, offset: Point) -> Option<usize> {
     let p = pos?;
+    let gx = p.x + offset.x;
+    let gy = p.y + offset.y;
     monitors.iter().position(|m| {
         let r = m.rect;
-        p.x >= r.x as f32
-            && p.x <= (r.x + r.w) as f32
-            && p.y >= r.y as f32
-            && p.y <= (r.y + r.h) as f32
+        gx >= r.x as f32 && gx <= (r.x + r.w) as f32 && gy >= r.y as f32 && gy <= (r.y + r.h) as f32
     })
 }
 
