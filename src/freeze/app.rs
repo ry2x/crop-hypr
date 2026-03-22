@@ -502,7 +502,7 @@ pub fn app_update(state: &mut AppState, msg: Message) -> Task<Message> {
     state.update(msg)
 }
 
-pub fn app_view(state: &AppState) -> iced::Element<'_, Message> {
+pub fn app_view(state: &AppState, _window: iced::window::Id) -> iced::Element<'_, Message> {
     state.view()
 }
 

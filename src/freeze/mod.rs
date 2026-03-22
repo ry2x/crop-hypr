@@ -55,7 +55,7 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
         let wins = windows.clone();
         let mons = monitors.clone();
 
-        iced_layershell::application(
+        iced_layershell::daemon(
             move || {
                 AppState::new(
                     img_handle.clone(),
@@ -75,6 +75,9 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
             exclusive_zone: -1,
             keyboard_interactivity: KeyboardInteractivity::Exclusive,
             start_mode: StartMode::AllScreens,
+            // daemon builder requires size unless Background; compositor overrides
+            // this value when anchored to all four edges.
+            size: Some((1, 1)),
             ..Default::default()
         })
         .run()
