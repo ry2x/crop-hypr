@@ -7,6 +7,7 @@ use std::{fs, path::PathBuf};
 pub enum WindowCaptureMethod {
     #[default]
     Geometry,
+    // TODO: implement xdg-desktop-portal (ashpd) based window capture
     Portal,
 }
 
