@@ -43,8 +43,11 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
     }
 
     // ── Step 2: decode image + build per-monitor handles ─────────────────────
-    let windows = overlay::fetch_windows().unwrap_or_default();
     let monitors = overlay::fetch_monitors().unwrap_or_default();
+
+    // Collect active workspace IDs so we only show currently-visible windows.
+    let active_ws_ids: Vec<i64> = monitors.iter().map(|m| m.active_workspace_id).collect();
+    let windows = overlay::fetch_windows(&active_ws_ids).unwrap_or_default();
 
     // Decode once; crop_imm is immutable so we can call it N times
     let full_img = ::image::open(&tmp_path).context("failed to decode screenshot")?;
