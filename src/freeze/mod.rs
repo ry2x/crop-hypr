@@ -3,7 +3,6 @@ mod overlay;
 
 use anyhow::{Context, Result};
 use app::{AppState, app_subscription, app_update, app_view};
-use chrono::Local;
 use iced::widget::image as iced_image;
 use iced_layershell::{
     reexport::{Anchor, KeyboardInteractivity, Layer},
@@ -17,6 +16,8 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+use crate::config::Config;
+
 /// Full freeze-mode flow:
 /// 1. Capture all monitors to a temp PNG
 /// 2. Load geometry info from hyprctl
@@ -25,7 +26,7 @@ use tempfile::NamedTempFile;
 /// 5. Crop the temp PNG and save to the output path
 ///
 /// Returns the saved path, or `None` if the user cancelled.
-pub fn run_freeze() -> Result<Option<PathBuf>> {
+pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
     // ── Step 1: capture full screen ──────────────────────────────────────────
     let tmp = NamedTempFile::with_suffix(".png").context("failed to create temp file")?;
     let tmp_path = tmp.path().to_owned();
@@ -85,21 +86,12 @@ pub fn run_freeze() -> Result<Option<PathBuf>> {
     match selected {
         None => Ok(None), // cancelled
         Some(region) => {
-            let out_path = output_path()?;
+            std::fs::create_dir_all(&cfg.save_path)?;
+            let out_path = cfg.output_path();
             crop_and_save(&tmp_path, region, &out_path)?;
             Ok(Some(out_path))
         }
     }
-}
-
-fn output_path() -> Result<PathBuf> {
-    let home = std::env::var("HOME").context("$HOME not set")?;
-    let dir = PathBuf::from(home).join("Pictures").join("Screenshots");
-    std::fs::create_dir_all(&dir)?;
-    let filename = Local::now()
-        .format("hyprsnap_%Y%m%d_%H%M%S.png")
-        .to_string();
-    Ok(dir.join(filename))
 }
 
 fn crop_and_save(

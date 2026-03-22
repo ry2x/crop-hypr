@@ -1,10 +1,12 @@
 mod capture;
 mod clipboard;
+mod config;
 mod freeze;
 mod notify;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use config::Config;
 
 #[derive(Parser)]
 #[command(name = "crop-hypr", about = "Hyprland screenshot tool", version)]
@@ -29,18 +31,19 @@ enum Commands {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
+    let cfg = Config::load()?;
 
     match cli.command {
         Commands::Crop => {
-            if let Some(path) = capture::capture_crop()? {
+            if let Some(path) = capture::capture_crop(&cfg)? {
                 finish(path)?;
             }
         }
-        Commands::Window => finish(capture::capture_window()?)?,
-        Commands::Monitor => finish(capture::capture_monitor()?)?,
-        Commands::All => finish(capture::capture_all()?)?,
+        Commands::Window => finish(capture::capture_window(&cfg)?)?,
+        Commands::Monitor => finish(capture::capture_monitor(&cfg)?)?,
+        Commands::All => finish(capture::capture_all(&cfg)?)?,
         Commands::Freeze => {
-            if let Some(path) = freeze::run_freeze()? {
+            if let Some(path) = freeze::run_freeze(&cfg)? {
                 finish(path)?;
             }
         }

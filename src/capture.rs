@@ -1,9 +1,10 @@
 use anyhow::{Context, Result, bail};
-use chrono::Local;
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
+
+use crate::config::Config;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,17 +33,11 @@ fn slurp_region() -> Result<Option<String>> {
     Ok(Some(region))
 }
 
-/// Build a timestamped output path under `~/Pictures/Screenshots/`.
-fn output_path() -> Result<PathBuf> {
-    let home = std::env::var("HOME").context("$HOME not set")?;
-    let dir = PathBuf::from(home).join("Pictures").join("Screenshots");
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("failed to create directory: {}", dir.display()))?;
-
-    let filename = Local::now()
-        .format("hyprsnap_%Y%m%d_%H%M%S.png")
-        .to_string();
-    Ok(dir.join(filename))
+/// Build the output path from config, creating the directory if needed.
+fn make_output_path(cfg: &Config) -> Result<PathBuf> {
+    std::fs::create_dir_all(&cfg.save_path)
+        .with_context(|| format!("failed to create directory: {}", cfg.save_path.display()))?;
+    Ok(cfg.output_path())
 }
 
 /// Invoke `grim` with the given extra args and save to `path`.
@@ -80,18 +75,18 @@ fn hyprctl_json(cmd: &str) -> Result<serde_json::Value> {
 
 /// Capture a user-selected crop region via slurp.
 /// Returns `None` if the user cancelled.
-pub fn capture_crop() -> Result<Option<PathBuf>> {
+pub fn capture_crop(cfg: &Config) -> Result<Option<PathBuf>> {
     let Some(region) = slurp_region()? else {
         return Ok(None);
     };
 
-    let path = output_path()?;
+    let path = make_output_path(cfg)?;
     run_grim(&["-g", &region], &path)?;
     Ok(Some(path))
 }
 
 /// Capture the currently active window using its geometry from hyprctl.
-pub fn capture_window() -> Result<PathBuf> {
+pub fn capture_window(cfg: &Config) -> Result<PathBuf> {
     let info = hyprctl_json("activewindow")?;
 
     let x = info["at"][0]
@@ -108,13 +103,13 @@ pub fn capture_window() -> Result<PathBuf> {
         .context("activewindow: missing size[1]")?;
 
     let region = format!("{x},{y} {w}x{h}");
-    let path = output_path()?;
+    let path = make_output_path(cfg)?;
     run_grim(&["-g", &region], &path)?;
     Ok(path)
 }
 
 /// Capture the focused monitor by output name.
-pub fn capture_monitor() -> Result<PathBuf> {
+pub fn capture_monitor(cfg: &Config) -> Result<PathBuf> {
     let monitors = hyprctl_json("monitors")?;
 
     let focused = monitors
@@ -128,14 +123,14 @@ pub fn capture_monitor() -> Result<PathBuf> {
         .as_str()
         .context("monitor: missing name field")?;
 
-    let path = output_path()?;
+    let path = make_output_path(cfg)?;
     run_grim(&["-o", name], &path)?;
     Ok(path)
 }
 
 /// Capture all monitors (grim default — no geometry flag).
-pub fn capture_all() -> Result<PathBuf> {
-    let path = output_path()?;
+pub fn capture_all(cfg: &Config) -> Result<PathBuf> {
+    let path = make_output_path(cfg)?;
     run_grim(&[], &path)?;
     Ok(path)
 }
