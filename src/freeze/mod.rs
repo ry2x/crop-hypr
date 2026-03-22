@@ -91,6 +91,7 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
                 let id = IcedId::unique();
                 window_to_monitor.insert(id, idx);
                 let settings = NewLayerShellSettings {
+                    size: Some((m.rect.w as u32, m.rect.h as u32)),
                     layer: Layer::Overlay,
                     anchor: Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right,
                     exclusive_zone: Some(-1),
