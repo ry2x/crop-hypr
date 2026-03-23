@@ -1,7 +1,7 @@
 # Maintainer: ry2x
 
 pkgname=crop-hypr
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="A fast, Hyprland-native screenshot tool written in Rust"
 arch=('x86_64')
