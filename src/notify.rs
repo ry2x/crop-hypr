@@ -2,12 +2,13 @@ use anyhow::{Context, Result};
 use std::{path::Path, process::Command};
 
 pub fn notify_success(path: &Path) {
+    let path_str = path.display().to_string();
     let _ = Command::new("notify-send")
         .args([
             "--app-name=crop-hypr",
-            "--icon=camera-photo",
+            &format!("--icon={path_str}"),
             "Screenshot saved",
-            &path.display().to_string(),
+            &path_str,
         ])
         .status();
 }
