@@ -30,24 +30,38 @@ use crate::config::Config;
 ///
 /// Returns the saved path, or `None` if the user cancelled.
 pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
-    // ── Step 1: capture all monitors into one composite PNG ──────────────────
+    // ── Step 1: capture + metadata (parallel) ────────────────────────────────
     let tmp = NamedTempFile::with_suffix(".png").context("failed to create temp file")?;
     let tmp_path = tmp.path().to_owned();
 
-    let status = Command::new("grim")
+    // Spawn grim without waiting so IPC queries can run concurrently.
+    let mut grim_child = Command::new("grim")
         .arg(tmp_path.to_str().unwrap())
-        .status()
+        .spawn()
         .context("failed to spawn grim")?;
-    if !status.success() {
+
+    // Fetch raw monitor + client JSON via Hyprland IPC socket in parallel.
+    let monitors_t = std::thread::spawn(overlay::fetch_monitors_raw);
+    let clients_t = std::thread::spawn(overlay::fetch_clients_raw);
+
+    let grim_status = grim_child.wait().context("grim wait failed")?;
+    if !grim_status.success() {
         anyhow::bail!("grim failed to capture screen");
     }
 
-    // ── Step 2: decode image + build per-monitor handles ─────────────────────
-    let monitors = overlay::fetch_monitors().unwrap_or_default();
+    let monitors_raw = monitors_t
+        .join()
+        .expect("monitors thread panicked")
+        .unwrap_or_default();
+    let clients_raw = clients_t
+        .join()
+        .expect("clients thread panicked")
+        .unwrap_or_default();
 
-    // Collect active workspace IDs so we only show currently-visible windows.
+    // ── Step 2: decode image + build per-monitor handles ─────────────────────
+    let monitors = overlay::parse_monitors(monitors_raw);
     let active_ws_ids: Vec<i64> = monitors.iter().map(|m| m.active_workspace_id).collect();
-    let windows = overlay::fetch_windows(&active_ws_ids).unwrap_or_default();
+    let windows = overlay::parse_windows(clients_raw, &active_ws_ids);
 
     // Decode once; crop_imm is immutable so we can call it N times
     let full_img = ::image::open(&tmp_path).context("failed to decode screenshot")?;
