@@ -18,9 +18,11 @@ The following tools must be available on `$PATH`:
 | ---- | ------- |
 | `grim` | Screen capture |
 | `slurp` | Interactive region selection (crop mode) |
-| `hyprctl` | Query Hyprland window/monitor state |
 | `wl-copy` | Copy image to Wayland clipboard |
 | `notify-send` | Desktop notifications (optional) |
+
+Window and monitor metadata is fetched directly via the **Hyprland IPC socket**
+(`$XDG_RUNTIME_DIR/hypr/<sig>/.socket.sock`).
 
 A [Nerd Font](https://www.nerdfonts.com/) is recommended for the freeze mode toolbar icons.
 
