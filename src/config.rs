@@ -57,8 +57,11 @@ impl Config {
         let raw = fs::read_to_string(&path)
             .with_context(|| format!("Failed to read config at {}", path.display()))?;
 
-        toml::from_str(&raw)
-            .with_context(|| format!("Failed to parse config at {}", path.display()))
+        let mut cfg: Self = toml::from_str(&raw)
+            .with_context(|| format!("Failed to parse config at {}", path.display()))?;
+
+        cfg.save_path = expand_tilde(&cfg.save_path);
+        Ok(cfg)
     }
 
     /// Expand `filename_pattern` with current timestamp and append `.png`.
@@ -80,4 +83,25 @@ fn config_path() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
         .join("crop-hypr")
         .join("config.toml")
+}
+
+fn expand_tilde(path: &PathBuf) -> PathBuf {
+    let s = path.to_string_lossy();
+    let expanded = if let Some(stripped) = s.strip_prefix("~/") {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(stripped)
+    } else if s == "~" {
+        dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
+    } else {
+        path.clone()
+    };
+
+    if expanded.is_absolute() {
+        expanded
+    } else {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(expanded)
+    }
 }
