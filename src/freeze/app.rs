@@ -45,8 +45,8 @@ pub enum CaptureMode {
 
 pub struct SelectionCanvas {
     pub mode: CaptureMode,
-    pub windows: Vec<WindowInfo>,
-    pub monitors: Vec<MonitorInfo>,
+    pub windows: Arc<Vec<WindowInfo>>,
+    pub monitors: Arc<Vec<MonitorInfo>>,
     /// Global pixel origin of the monitor this overlay window is on.
     /// Canvas coordinates are local (0,0 = top-left of this monitor).
     /// `canvas_local = global - offset`
@@ -250,8 +250,8 @@ pub struct AppState {
     pub focused_monitor_idx: usize,
     /// Maps extra window IDs (spawned at boot) → monitor index
     pub window_to_monitor: HashMap<iced::window::Id, usize>,
-    pub windows: Vec<WindowInfo>,
-    pub monitors: Vec<MonitorInfo>,
+    pub windows: Arc<Vec<WindowInfo>>,
+    pub monitors: Arc<Vec<MonitorInfo>>,
     /// None        = cancelled (ESC, never set)
     /// Some(None)  = "All" selected (use full screenshot)
     /// Some(Some)  = region selected
@@ -267,8 +267,8 @@ impl AppState {
         monitor_images: Vec<image::Handle>,
         focused_monitor_idx: usize,
         window_to_monitor: HashMap<iced::window::Id, usize>,
-        windows: Vec<WindowInfo>,
-        monitors: Vec<MonitorInfo>,
+        windows: Arc<Vec<WindowInfo>>,
+        monitors: Arc<Vec<MonitorInfo>>,
         result: Arc<Mutex<Option<Option<ScreenRect>>>>,
     ) -> Self {
         Self {
@@ -331,8 +331,8 @@ impl AppState {
 
         let canvas_prog = SelectionCanvas {
             mode: self.mode,
-            windows: self.windows.clone(),
-            monitors: self.monitors.clone(),
+            windows: Arc::clone(&self.windows),
+            monitors: Arc::clone(&self.monitors),
             monitor_offset,
         };
 
