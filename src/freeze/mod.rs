@@ -63,8 +63,12 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
     let active_ws_ids: Vec<i64> = monitors.iter().map(|m| m.active_workspace_id).collect();
     let windows = overlay::parse_windows(clients_raw, &active_ws_ids);
 
-    // Decode once; crop_imm is immutable so we can call it N times
-    let full_img = ::image::open(&tmp_path).context("failed to decode screenshot")?;
+    // Decode once and convert to RGBA8 upfront.
+    // grim outputs RGB PNG; converting the full image here avoids a per-monitor
+    // channel conversion inside the crop loop.
+    let full_rgba = ::image::open(&tmp_path)
+        .context("failed to decode screenshot")?
+        .into_rgba8();
 
     // Build a per-monitor image handle pre-decoded as RGBA bytes so iced
     // renders it immediately (no async loading stall on first frame)
@@ -73,9 +77,9 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
         .map(|m| {
             let x = m.rect.x.max(0) as u32;
             let y = m.rect.y.max(0) as u32;
-            let w = (m.rect.w as u32).min(full_img.width().saturating_sub(x));
-            let h = (m.rect.h as u32).min(full_img.height().saturating_sub(y));
-            let cropped = full_img.crop_imm(x, y, w, h).into_rgba8();
+            let w = (m.rect.w as u32).min(full_rgba.width().saturating_sub(x));
+            let h = (m.rect.h as u32).min(full_rgba.height().saturating_sub(y));
+            let cropped = ::image::imageops::crop_imm(&full_rgba, x, y, w, h).to_image();
             iced_image::Handle::from_rgba(cropped.width(), cropped.height(), cropped.into_raw())
         })
         .collect();
@@ -123,8 +127,8 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
 
         let extra_specs = std::sync::Arc::new(extra_specs);
 
-        let wins = windows.clone();
-        let mons = monitors.clone();
+        let wins = Arc::new(windows);
+        let mons = Arc::new(monitors);
 
         iced_layershell::daemon(
             move || {
@@ -142,8 +146,8 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
                     monitor_images.clone(),
                     focused_monitor_idx,
                     window_to_monitor.clone(),
-                    wins.clone(),
-                    mons.clone(),
+                    Arc::clone(&wins),
+                    Arc::clone(&mons),
                     result_clone.clone(),
                 );
                 (state, Task::batch(spawn_tasks))
@@ -175,27 +179,27 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
         Some(region) => {
             std::fs::create_dir_all(&cfg.save_path)?;
             let out_path = cfg.output_path();
-            crop_and_save(&tmp_path, region, &out_path)?;
+            crop_and_save(full_rgba, region, &out_path)?;
             Ok(Some(out_path))
         }
     }
 }
 
 fn crop_and_save(
-    src: &std::path::Path,
+    img: ::image::ImageBuffer<::image::Rgba<u8>, Vec<u8>>,
     region: Option<ScreenRect>,
     dst: &std::path::Path,
 ) -> Result<()> {
-    let img = ::image::open(src).context("failed to open temp screenshot")?;
-
     let cropped = match region {
-        None => img,
+        None => ::image::DynamicImage::ImageRgba8(img),
         Some(r) => {
             let x = r.x.max(0) as u32;
             let y = r.y.max(0) as u32;
             let w = (r.w as u32).min(img.width().saturating_sub(x));
             let h = (r.h as u32).min(img.height().saturating_sub(y));
-            img.crop_imm(x, y, w, h)
+            ::image::DynamicImage::ImageRgba8(
+                ::image::imageops::crop_imm(&img, x, y, w, h).to_image(),
+            )
         }
     };
 
