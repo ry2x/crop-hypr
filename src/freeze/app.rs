@@ -370,10 +370,22 @@ impl AppState {
         Container::new(
             Row::new()
                 .spacing(8)
-                .push(btn("\u{F019F}", CaptureMode::Crop,    self.mode == CaptureMode::Crop))
-                .push(btn("\u{EB7F}", CaptureMode::Window,  self.mode == CaptureMode::Window))
-                .push(btn("\u{F0379}", CaptureMode::Monitor, self.mode == CaptureMode::Monitor))
-                .push(btn("\u{F004C}", CaptureMode::All,     false))
+                .push(btn(
+                    "\u{F019F}",
+                    CaptureMode::Crop,
+                    self.mode == CaptureMode::Crop,
+                ))
+                .push(btn(
+                    "\u{EB7F}",
+                    CaptureMode::Window,
+                    self.mode == CaptureMode::Window,
+                ))
+                .push(btn(
+                    "\u{F0379}",
+                    CaptureMode::Monitor,
+                    self.mode == CaptureMode::Monitor,
+                ))
+                .push(btn("\u{F004C}", CaptureMode::All, false))
                 .push(
                     button(Text::new("\u{F05AD}").size(22))
                         .on_press(Message::Cancel)
