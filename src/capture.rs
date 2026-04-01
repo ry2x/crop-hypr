@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::config::Config;
+use crate::hyprland;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,22 +56,6 @@ fn run_grim(extra_args: &[&str], path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-/// Run `hyprctl -j <cmd>` and parse the JSON output.
-fn hyprctl_json(cmd: &str) -> Result<serde_json::Value> {
-    let output = Command::new("hyprctl")
-        .args(["-j", cmd])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .output()
-        .context("failed to spawn hyprctl — is Hyprland running?")?;
-
-    if !output.status.success() {
-        bail!("hyprctl {cmd} failed");
-    }
-
-    serde_json::from_slice(&output.stdout).context("failed to parse hyprctl JSON")
-}
-
 // ── public capture functions ──────────────────────────────────────────────────
 
 /// Capture a user-selected crop region via slurp.
@@ -87,7 +72,7 @@ pub fn capture_crop(cfg: &Config) -> Result<Option<PathBuf>> {
 
 /// Capture the currently active window using its geometry from hyprctl.
 pub fn capture_window(cfg: &Config) -> Result<PathBuf> {
-    let info = hyprctl_json("activewindow")?;
+    let info = hyprland::hyprland_ipc("activewindow")?;
 
     let x = info["at"][0]
         .as_i64()
@@ -110,7 +95,7 @@ pub fn capture_window(cfg: &Config) -> Result<PathBuf> {
 
 /// Capture the focused monitor by output name.
 pub fn capture_monitor(cfg: &Config) -> Result<PathBuf> {
-    let monitors = hyprctl_json("monitors")?;
+    let monitors = hyprland::hyprland_ipc("monitors")?;
 
     let focused = monitors
         .as_array()

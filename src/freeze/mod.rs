@@ -1,5 +1,4 @@
 mod app;
-mod overlay;
 
 use anyhow::{Context, Result};
 use app::{AppState, Message, app_subscription, app_update, app_view};
@@ -9,7 +8,6 @@ use iced_layershell::{
     reexport::{Anchor, IcedId, KeyboardInteractivity, Layer, NewLayerShellSettings, OutputOption},
     settings::LayerShellSettings,
 };
-use overlay::ScreenRect;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -19,6 +17,7 @@ use std::{
 use tempfile::NamedTempFile;
 
 use crate::config::Config;
+use crate::hyprland::{self, ScreenRect};
 
 /// Full freeze-mode flow:
 /// 1. Capture all monitors to a single composite PNG via grim
@@ -41,8 +40,8 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
         .context("failed to spawn grim")?;
 
     // Fetch raw monitor + client JSON via Hyprland IPC socket in parallel.
-    let monitors_t = std::thread::spawn(overlay::fetch_monitors_raw);
-    let clients_t = std::thread::spawn(overlay::fetch_clients_raw);
+    let monitors_t = std::thread::spawn(|| hyprland::hyprland_ipc("monitors"));
+    let clients_t = std::thread::spawn(|| hyprland::hyprland_ipc("clients"));
 
     let grim_status = grim_child.wait().context("grim wait failed")?;
     if !grim_status.success() {
@@ -59,9 +58,9 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
         .unwrap_or_default();
 
     // ── Step 2: decode image + build per-monitor handles ─────────────────────
-    let monitors = overlay::parse_monitors(monitors_raw);
+    let monitors = hyprland::parse_monitors(monitors_raw);
     let active_ws_ids: Vec<i64> = monitors.iter().map(|m| m.active_workspace_id).collect();
-    let windows = overlay::parse_windows(clients_raw, &active_ws_ids);
+    let windows = hyprland::parse_windows(clients_raw, &active_ws_ids);
 
     // Decode once and convert to RGBA8 upfront.
     // grim outputs RGB PNG; converting the full image here avoids a per-monitor

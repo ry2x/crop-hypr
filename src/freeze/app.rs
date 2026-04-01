@@ -15,7 +15,7 @@ use iced::{
     },
 };
 
-use super::overlay::{MonitorInfo, ScreenRect, WindowInfo};
+use crate::hyprland::{MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
 

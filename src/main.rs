@@ -2,6 +2,7 @@ mod capture;
 mod clipboard;
 mod config;
 mod freeze;
+mod hyprland;
 mod notify;
 
 use anyhow::Result;
