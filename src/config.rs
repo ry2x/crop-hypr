@@ -85,7 +85,7 @@ fn config_path() -> PathBuf {
         .join("config.toml")
 }
 
-fn expand_tilde(path: &PathBuf) -> PathBuf {
+fn expand_tilde(path: &std::path::Path) -> PathBuf {
     let s = path.to_string_lossy();
     let expanded = if let Some(stripped) = s.strip_prefix("~/") {
         dirs::home_dir()
@@ -94,7 +94,7 @@ fn expand_tilde(path: &PathBuf) -> PathBuf {
     } else if s == "~" {
         dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
     } else {
-        path.clone()
+        path.to_path_buf()
     };
 
     if expanded.is_absolute() {
