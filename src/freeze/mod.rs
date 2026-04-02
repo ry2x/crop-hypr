@@ -10,38 +10,17 @@ use iced_layershell::{
 use std::{
     collections::HashMap,
     path::PathBuf,
-    process::Command,
     sync::{Arc, Mutex},
 };
-use tempfile::NamedTempFile;
 
-use crate::cmd::CMD_GRIM;
 use crate::config::Config;
 use crate::error::{AppError, Result};
 use crate::hyprland::{self, ScreenRect};
+use crate::screencopy;
 
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
-    let tmp = NamedTempFile::with_suffix(".png")
-        .map_err(|e| AppError::Other(format!("failed to create temp file: {}", e)))?;
-    let tmp_path = tmp.path().to_owned();
-
-    let tmp_path_str = tmp_path
-        .to_str()
-        .ok_or_else(|| AppError::Other("Temp path contains invalid UTF-8".to_string()))?;
-
-    let mut grim_child = Command::new(CMD_GRIM)
-        .arg(tmp_path_str)
-        .spawn()
-        .map_err(|e| AppError::CommandNotFound(CMD_GRIM.to_string(), e))?;
-
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
     let clients_t = std::thread::spawn(hyprland::get_clients);
-
-    let grim_status = grim_child.wait().map_err(AppError::from)?;
-
-    if !grim_status.success() {
-        return Err(AppError::CommandFailed(CMD_GRIM.to_string(), grim_status));
-    }
 
     let monitors_raw = monitors_t.join().expect("monitors thread panicked")?;
     let clients_raw = clients_t.join().expect("clients thread panicked")?;
@@ -50,18 +29,22 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let active_ws_ids: Vec<i64> = monitors.iter().map(|m| m.active_workspace_id).collect();
     let windows = hyprland::parse_windows(clients_raw, &active_ws_ids);
 
-    let full_rgba = ::image::open(&tmp_path)?.into_rgba8();
+    // Compute origin before monitors are moved into Arc.
+    // capture_all_monitors places (min_x, min_y) at image pixel (0,0); we need this
+    // to translate the UI's global logical coordinates into image coordinates later.
+    let min_x = monitors.iter().map(|m| m.rect.x).min().unwrap_or(0);
+    let min_y = monitors.iter().map(|m| m.rect.y).min().unwrap_or(0);
 
-    let monitor_images: Vec<iced_image::Handle> = monitors
-        .iter()
-        .map(|m| {
-            let x = m.rect.x.max(0) as u32;
-            let y = m.rect.y.max(0) as u32;
-            let w = (m.rect.w as u32).min(full_rgba.width().saturating_sub(x));
-            let h = (m.rect.h as u32).min(full_rgba.height().saturating_sub(y));
-            let cropped = ::image::imageops::crop_imm(&full_rgba, x, y, w, h).to_image();
-            iced_image::Handle::from_rgba(cropped.width(), cropped.height(), cropped.into_raw())
-        })
+    // Capture all monitors in a single Wayland session.
+    // Using one session guarantees the overlay images and the final-crop source are
+    // from the same frame — two separate captures would differ in time, breaking
+    // the "freeze" guarantee (user selects based on a different frame than what gets saved).
+    let (physical_per_monitor, full_rgba) =
+        screencopy::capture_all_monitors_with_physical(&monitors)?;
+
+    let monitor_images: Vec<iced_image::Handle> = physical_per_monitor
+        .into_iter()
+        .map(|img| iced_image::Handle::from_rgba(img.width(), img.height(), img.into_raw()))
         .collect();
 
     let focused_monitor_idx = monitors.iter().position(|m| m.focused).unwrap_or(0);
@@ -142,13 +125,24 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         .map_err(|e| AppError::LayerShell(e.to_string()))?;
     }
 
-    let selected = result.lock().unwrap().take();
+    let selected = result
+        .lock()
+        .expect("UI thread panicked and poisoned result mutex")
+        .take();
 
     match selected {
         None => Err(AppError::UserCancelled),
         Some(region) => {
             let out_path = cfg.output_path();
-            crop_and_save(full_rgba, region, &out_path)?;
+            // Translate global logical coordinates → image coordinates.
+            // The image origin is (min_x, min_y) in global logical space.
+            let adjusted = region.map(|r| ScreenRect {
+                x: r.x - min_x,
+                y: r.y - min_y,
+                w: r.w,
+                h: r.h,
+            });
+            crop_and_save(full_rgba, adjusted, &out_path)?;
             Ok(out_path)
         }
     }
