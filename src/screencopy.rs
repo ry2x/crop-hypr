@@ -58,15 +58,16 @@ impl CaptureState {
 /// Convert a pixel at byte `offset` in `data` to RGBA based on the shm format.
 ///
 /// Wayland shm format memory layout (little-endian):
-/// - ARGB8888 / XRGB8888: bytes = [Blue, Green, Red, Alpha/X]
-/// - ABGR8888 / XBGR8888: bytes = [Red, Green, Blue, Alpha/X]
+/// - ARGB8888: bytes = [Blue, Green, Red, Alpha]  → RGBA uses real alpha
+/// - XRGB8888: bytes = [Blue, Green, Red, X]      → alpha forced to 255
+/// - ABGR8888: bytes = [Red, Green, Blue, Alpha]  → RGBA uses real alpha
+/// - XBGR8888: bytes = [Red, Green, Blue, X]      → alpha forced to 255
 ///
 /// Non-panicking: if the buffer is too small, logs a warning and returns transparent black.
 fn read_pixel_rgba(data: &[u8], offset: usize, format: WEnum<wl_shm::Format>) -> Rgba<u8> {
-    // Guard against buffer/stride/format inconsistency without panicking.
-    // offset+2 must be a valid index; use checked_add to avoid offset+2 wrapping on 32-bit.
+    // Need 4 bytes (offset..offset+3); checked_add avoids wrapping on 32-bit targets.
     let ok = offset
-        .checked_add(2)
+        .checked_add(3)
         .is_some_and(|max_idx| max_idx < data.len());
     if !ok {
         eprintln!(
@@ -78,20 +79,23 @@ fn read_pixel_rgba(data: &[u8], offset: usize, format: WEnum<wl_shm::Format>) ->
     let b0 = data[offset];
     let b1 = data[offset + 1];
     let b2 = data[offset + 2];
+    let b3 = data[offset + 3];
     match format {
-        WEnum::Value(wl_shm::Format::Argb8888) | WEnum::Value(wl_shm::Format::Xrgb8888) => {
-            Rgba([b2, b1, b0, 255])
-        }
-        WEnum::Value(wl_shm::Format::Abgr8888) | WEnum::Value(wl_shm::Format::Xbgr8888) => {
-            Rgba([b0, b1, b2, 255])
-        }
+        // ARGB8888: [B, G, R, A] → real alpha
+        WEnum::Value(wl_shm::Format::Argb8888) => Rgba([b2, b1, b0, b3]),
+        // XRGB8888: [B, G, R, X] → alpha forced 255 (X channel is padding)
+        WEnum::Value(wl_shm::Format::Xrgb8888) => Rgba([b2, b1, b0, 255]),
+        // ABGR8888: [R, G, B, A] → real alpha
+        WEnum::Value(wl_shm::Format::Abgr8888) => Rgba([b0, b1, b2, b3]),
+        // XBGR8888: [R, G, B, X] → alpha forced 255
+        WEnum::Value(wl_shm::Format::Xbgr8888) => Rgba([b0, b1, b2, 255]),
         // Defensive fallback: the Buffer event handler whitelists supported formats, so this
         // branch should never be reached in practice.
         _ => {
             eprintln!(
                 "read_pixel_rgba: unsupported wl_shm format {format:?}, falling back to ARGB8888 layout"
             );
-            Rgba([b2, b1, b0, 255])
+            Rgba([b2, b1, b0, b3])
         }
     }
 }
@@ -264,9 +268,66 @@ impl Dispatch<zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1, ()> for CaptureSt
                 height,
                 stride,
             } => {
-                // Use usize arithmetic to avoid u32 overflow on large HiDPI buffers
-                // (e.g. 7680×4320 at stride 4 bytes/px ≈ 132 MB — fits in usize, not u32).
-                let size = stride as usize * height as usize;
+                // --- Step 1: format whitelist (earliest rejection) ---
+                // Only 32bpp formats are supported; reject everything else before
+                // allocating any resources to avoid corrupt output downstream.
+                let shm_format = match format {
+                    WEnum::Value(
+                        v @ (wl_shm::Format::Argb8888
+                        | wl_shm::Format::Xrgb8888
+                        | wl_shm::Format::Abgr8888
+                        | wl_shm::Format::Xbgr8888),
+                    ) => v,
+                    _ => {
+                        state.frames[fi_idx].failed = true;
+                        state.frames[fi_idx].error_msg =
+                            Some(format!("unsupported shm format: {format:?}"));
+                        return;
+                    }
+                };
+
+                // --- Step 2: stride validation ---
+                // stride < width*4 would cause reads past the end of each row;
+                // stride % 4 != 0 would misalign per-pixel offsets.
+                let stride_usize = stride as usize;
+                let width_usize = width as usize;
+                let height_usize = height as usize;
+                let Some(bytes_per_row) = width_usize.checked_mul(4) else {
+                    state.frames[fi_idx].failed = true;
+                    state.frames[fi_idx].error_msg = Some(format!(
+                        "invalid buffer dimensions: width {width} * 4 overflows usize"
+                    ));
+                    return;
+                };
+                if stride_usize < bytes_per_row || !stride_usize.is_multiple_of(4) {
+                    state.frames[fi_idx].failed = true;
+                    state.frames[fi_idx].error_msg = Some(format!(
+                        "invalid compositor stride: stride={stride} width={width} (expected ≥{bytes_per_row} and multiple of 4)"
+                    ));
+                    return;
+                }
+
+                // --- Step 3: buffer size ---
+                // Use checked_mul to detect overflow (very large HiDPI buffers).
+                let Some(size) = stride_usize.checked_mul(height_usize) else {
+                    state.frames[fi_idx].failed = true;
+                    state.frames[fi_idx].error_msg = Some(format!(
+                        "buffer size overflow: stride={stride} * height={height}"
+                    ));
+                    return;
+                };
+                // wl_shm::create_pool takes i32; reject before truncating.
+                let pool_size_i32 = match i32::try_from(size) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        state.frames[fi_idx].failed = true;
+                        state.frames[fi_idx].error_msg = Some(format!(
+                            "shm pool size too large: {size} bytes (max {})",
+                            i32::MAX
+                        ));
+                        return;
+                    }
+                };
 
                 let memfd_name = CString::new("screencopy")
                     .expect("CString::new cannot fail for static literal");
@@ -295,32 +356,10 @@ impl Dispatch<zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1, ()> for CaptureSt
                         return;
                     }
                 };
-                // Create the shm pool while only holding an immutable borrow of `state.shm`,
-                // so that this borrow is finished before we later take a mutable borrow of
-                // `state.frames[fi_idx]`. This keeps the lifecycle of Wayland shm resources
-                // (pool and buffer) clearly separated from the mutation of per-frame state,
-                // and ensures the shm global is available when setting up the frame buffer.
-                // Whitelist the four 32bpp formats the pipeline supports.
-                // Any other format (e.g. RGB565, R8) would cause incorrect memory offsets
-                // or wrong channel mapping — reject immediately rather than produce corrupt output.
-                let shm_format = match format {
-                    WEnum::Value(
-                        v @ (wl_shm::Format::Argb8888
-                        | wl_shm::Format::Xrgb8888
-                        | wl_shm::Format::Abgr8888
-                        | wl_shm::Format::Xbgr8888),
-                    ) => v,
-                    _ => {
-                        state.frames[fi_idx].failed = true;
-                        state.frames[fi_idx].error_msg =
-                            Some(format!("unsupported shm format: {format:?}"));
-                        return;
-                    }
-                };
 
                 // Borrow shm separately; NLL ends this borrow before the mutable frame update below.
                 let pool = match state.shm.as_ref() {
-                    Some(shm) => shm.create_pool(file.as_fd(), size as i32, qh, ()),
+                    Some(shm) => shm.create_pool(file.as_fd(), pool_size_i32, qh, ()),
                     None => {
                         state.frames[fi_idx].failed = true;
                         state.frames[fi_idx].error_msg =
@@ -461,9 +500,7 @@ pub type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
 /// The output dimensions and pixel coordinates match what Hyprland IPC and slurp report,
 /// so crop coordinates can be applied directly without coordinate conversion.
 /// HiDPI monitors are downsampled to their logical size during compositing.
-pub fn capture_all_monitors(
-    monitors: &[crate::hyprland::MonitorInfo],
-) -> Result<RgbaImage> {
+pub fn capture_all_monitors(monitors: &[crate::hyprland::MonitorInfo]) -> Result<RgbaImage> {
     Ok(capture_all_monitors_with_physical(monitors)?.1)
 }
 

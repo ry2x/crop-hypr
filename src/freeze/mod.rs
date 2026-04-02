@@ -125,7 +125,10 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         .map_err(|e| AppError::LayerShell(e.to_string()))?;
     }
 
-    let selected = result.lock().expect("UI thread did not panic").take();
+    let selected = result
+        .lock()
+        .expect("UI thread panicked and poisoned result mutex")
+        .take();
 
     match selected {
         None => Err(AppError::UserCancelled),
