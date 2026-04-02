@@ -35,22 +35,17 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let min_x = monitors.iter().map(|m| m.rect.x).min().unwrap_or(0);
     let min_y = monitors.iter().map(|m| m.rect.y).min().unwrap_or(0);
 
-    let full_rgba = screencopy::capture_all_monitors(&monitors)?;
+    // Capture all monitors in a single Wayland session.
+    // Using one session guarantees the overlay images and the final-crop source are
+    // from the same frame — two separate captures would differ in time, breaking
+    // the "freeze" guarantee (user selects based on a different frame than what gets saved).
+    let (physical_per_monitor, full_rgba) =
+        screencopy::capture_all_monitors_with_physical(&monitors)?;
 
-    // Capture each monitor at physical resolution for a crisp HiDPI overlay.
-    // capture_all_monitors returns a logical-space (downsampled) composite; using that
-    // for the overlay would produce a blurry freeze image on HiDPI displays.
-    let monitor_images: Vec<iced_image::Handle> = monitors
-        .iter()
-        .map(|m| -> Result<iced_image::Handle> {
-            let img = screencopy::capture_monitor(&m.name)?;
-            Ok(iced_image::Handle::from_rgba(
-                img.width(),
-                img.height(),
-                img.into_raw(),
-            ))
-        })
-        .collect::<Result<Vec<iced_image::Handle>>>()?;
+    let monitor_images: Vec<iced_image::Handle> = physical_per_monitor
+        .into_iter()
+        .map(|img| iced_image::Handle::from_rgba(img.width(), img.height(), img.into_raw()))
+        .collect();
 
     let focused_monitor_idx = monitors.iter().position(|m| m.focused).unwrap_or(0);
 

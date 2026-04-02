@@ -60,17 +60,24 @@ impl CaptureState {
 /// Wayland shm format memory layout (little-endian):
 /// - ARGB8888 / XRGB8888: bytes = [Blue, Green, Red, Alpha/X]
 /// - ABGR8888 / XBGR8888: bytes = [Red, Green, Blue, Alpha/X]
+///
+/// Non-panicking: if the buffer is too small, logs a warning and returns transparent black.
 fn read_pixel_rgba(data: &[u8], offset: usize, format: WEnum<wl_shm::Format>) -> Rgba<u8> {
-    // Use `get` + `expect` to make potential out-of-bounds explicit and avoid raw indexing.
-    let b0 = *data
-        .get(offset)
-        .expect("read_pixel_rgba: offset is out of bounds for data slice");
-    let b1 = *data
-        .get(offset + 1)
-        .expect("read_pixel_rgba: offset + 1 is out of bounds for data slice");
-    let b2 = *data
-        .get(offset + 2)
-        .expect("read_pixel_rgba: offset + 2 is out of bounds for data slice");
+    // Guard against buffer/stride/format inconsistency without panicking.
+    // offset+2 must be a valid index; use checked_add to avoid offset+2 wrapping on 32-bit.
+    let ok = offset
+        .checked_add(2)
+        .is_some_and(|max_idx| max_idx < data.len());
+    if !ok {
+        eprintln!(
+            "read_pixel_rgba: offset {offset} out of bounds for buffer length {} (format: {format:?})",
+            data.len()
+        );
+        return Rgba([0, 0, 0, 0]);
+    }
+    let b0 = data[offset];
+    let b1 = data[offset + 1];
+    let b2 = data[offset + 2];
     match format {
         WEnum::Value(wl_shm::Format::Argb8888) | WEnum::Value(wl_shm::Format::Xrgb8888) => {
             Rgba([b2, b1, b0, 255])
@@ -78,14 +85,11 @@ fn read_pixel_rgba(data: &[u8], offset: usize, format: WEnum<wl_shm::Format>) ->
         WEnum::Value(wl_shm::Format::Abgr8888) | WEnum::Value(wl_shm::Format::Xbgr8888) => {
             Rgba([b0, b1, b2, 255])
         }
-        // Unknown / unsupported formats: fall back to ARGB8888 byte layout (B,G,R,A).
-        // This matches the most common wlroots setup, but colors will be wrong if the
-        // compositor actually uses a different pixel format. We log here to make such
-        // protocol / environment drift visible instead of failing hard.
+        // Defensive fallback: the Buffer event handler whitelists supported formats, so this
+        // branch should never be reached in practice.
         _ => {
             eprintln!(
-                "read_pixel_rgba: unsupported wl_shm format {:?}, falling back to ARGB8888-like layout",
-                format
+                "read_pixel_rgba: unsupported wl_shm format {format:?}, falling back to ARGB8888 layout"
             );
             Rgba([b2, b1, b0, 255])
         }
@@ -260,7 +264,9 @@ impl Dispatch<zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1, ()> for CaptureSt
                 height,
                 stride,
             } => {
-                let size = (stride * height) as usize;
+                // Use usize arithmetic to avoid u32 overflow on large HiDPI buffers
+                // (e.g. 7680×4320 at stride 4 bytes/px ≈ 132 MB — fits in usize, not u32).
+                let size = stride as usize * height as usize;
 
                 let memfd_name = CString::new("screencopy")
                     .expect("CString::new cannot fail for static literal");
@@ -294,12 +300,20 @@ impl Dispatch<zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1, ()> for CaptureSt
                 // `state.frames[fi_idx]`. This keeps the lifecycle of Wayland shm resources
                 // (pool and buffer) clearly separated from the mutation of per-frame state,
                 // and ensures the shm global is available when setting up the frame buffer.
+                // Whitelist the four 32bpp formats the pipeline supports.
+                // Any other format (e.g. RGB565, R8) would cause incorrect memory offsets
+                // or wrong channel mapping — reject immediately rather than produce corrupt output.
                 let shm_format = match format {
-                    WEnum::Value(v) => v,
-                    WEnum::Unknown(raw) => {
+                    WEnum::Value(
+                        v @ (wl_shm::Format::Argb8888
+                        | wl_shm::Format::Xrgb8888
+                        | wl_shm::Format::Abgr8888
+                        | wl_shm::Format::Xbgr8888),
+                    ) => v,
+                    _ => {
                         state.frames[fi_idx].failed = true;
                         state.frames[fi_idx].error_msg =
-                            Some(format!("unsupported shm format: {raw:#x}"));
+                            Some(format!("unsupported shm format: {format:?}"));
                         return;
                     }
                 };
@@ -374,7 +388,7 @@ impl Dispatch<wl_buffer::WlBuffer, ()> for CaptureState {
 // --- Public capture API ---
 
 /// Capture a single monitor at full physical resolution.
-pub fn capture_monitor(monitor_name: &str) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+pub fn capture_monitor(monitor_name: &str) -> Result<RgbaImage> {
     let (mut event_queue, mut state) = init_wayland()?;
     let qh = event_queue.handle();
 
@@ -431,12 +445,16 @@ pub fn capture_monitor(monitor_name: &str) -> Result<ImageBuffer<Rgba<u8>, Vec<u
     let mut img = ImageBuffer::new(fi.width, fi.height);
     for y in 0..fi.height {
         for x in 0..fi.width {
-            let offset = (y * fi.stride + x * 4) as usize;
+            // Compute offset in usize to avoid u32 overflow on large physical buffers.
+            let offset = y as usize * fi.stride as usize + x as usize * 4;
             img.put_pixel(x, y, read_pixel_rgba(mmap, offset, format));
         }
     }
     Ok(img)
 }
+
+/// Type alias to reduce verbosity of per-monitor capture return types.
+pub type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
 
 /// Capture all monitors and composite them into a single image in **logical pixel space**.
 ///
@@ -445,7 +463,20 @@ pub fn capture_monitor(monitor_name: &str) -> Result<ImageBuffer<Rgba<u8>, Vec<u
 /// HiDPI monitors are downsampled to their logical size during compositing.
 pub fn capture_all_monitors(
     monitors: &[crate::hyprland::MonitorInfo],
-) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+) -> Result<RgbaImage> {
+    Ok(capture_all_monitors_with_physical(monitors)?.1)
+}
+
+/// Capture all monitors in a **single Wayland session** and return:
+/// - Per-monitor physical-resolution images (in the same order as `monitors`)
+/// - Logical-space composite of all monitors (for crop operations)
+///
+/// Using one session ensures the overlay and the final crop originate from the
+/// same frame, which is critical for the freeze-mode "what you see is what you
+/// save" guarantee.
+pub fn capture_all_monitors_with_physical(
+    monitors: &[crate::hyprland::MonitorInfo],
+) -> Result<(Vec<RgbaImage>, RgbaImage)> {
     if monitors.is_empty() {
         return Err(AppError::Other(
             "No monitors provided to capture".to_string(),
@@ -460,55 +491,39 @@ pub fn capture_all_monitors(
         .as_ref()
         .ok_or_else(|| AppError::Other("zwlr_screencopy_manager_v1 not available".to_string()))?;
 
-    // Compute bounding box and launch captures for all known monitors.
-    let min_x = monitors
-        .iter()
-        .map(|m| m.rect.x)
-        .min()
-        .expect("monitors is non-empty, checked above");
-    let min_y = monitors
-        .iter()
-        .map(|m| m.rect.y)
-        .min()
-        .expect("monitors is non-empty, checked above");
-    let max_x = monitors
-        .iter()
-        .map(|m| m.rect.x + m.rect.w)
-        .max()
-        .expect("monitors is non-empty, checked above");
-    let max_y = monitors
-        .iter()
-        .map(|m| m.rect.y + m.rect.h)
-        .max()
-        .expect("monitors is non-empty, checked above");
-
+    // Match every monitor to a Wayland output. Fail if any are missing — a partial
+    // composite would have black regions and incorrect bounding-box geometry.
+    let mut unmatched: Vec<&str> = Vec::new();
     for m in monitors {
-        if let Some(output) = state
+        match state
             .outputs
             .iter()
             .find(|o| o.name.as_deref() == Some(&m.name))
         {
-            let frame = screencopy_mgr.capture_output(0, &output.output, &qh, ());
-            state.frames.push(FrameInfo {
-                frame,
-                width: 0,
-                height: 0,
-                stride: 0,
-                format: None,
-                ready: false,
-                failed: false,
-                error_msg: None,
-                mmap: None,
-                buffer: None,
-                name: m.name.clone(),
-            });
+            Some(output) => {
+                let frame = screencopy_mgr.capture_output(0, &output.output, &qh, ());
+                state.frames.push(FrameInfo {
+                    frame,
+                    width: 0,
+                    height: 0,
+                    stride: 0,
+                    format: None,
+                    ready: false,
+                    failed: false,
+                    error_msg: None,
+                    mmap: None,
+                    buffer: None,
+                    name: m.name.clone(),
+                });
+            }
+            None => unmatched.push(&m.name),
         }
     }
-
-    if state.frames.is_empty() {
-        return Err(AppError::Other(
-            "No matching Wayland outputs found for provided monitors".to_string(),
-        ));
+    if !unmatched.is_empty() {
+        return Err(AppError::Other(format!(
+            "No Wayland output found for monitors: {}",
+            unmatched.join(", ")
+        )));
     }
 
     loop {
@@ -539,9 +554,35 @@ pub fn capture_all_monitors(
         )));
     }
 
+    // All monitors are matched (unmatched check above), so bounding box from monitors is safe.
+    let min_x = monitors
+        .iter()
+        .map(|m| m.rect.x)
+        .min()
+        .expect("monitors is non-empty, checked above");
+    let min_y = monitors
+        .iter()
+        .map(|m| m.rect.y)
+        .min()
+        .expect("monitors is non-empty, checked above");
+    let max_x = monitors
+        .iter()
+        .map(|m| m.rect.x + m.rect.w)
+        .max()
+        .expect("monitors is non-empty, checked above");
+    let max_y = monitors
+        .iter()
+        .map(|m| m.rect.y + m.rect.h)
+        .max()
+        .expect("monitors is non-empty, checked above");
+
     let total_width = (max_x - min_x).max(0) as u32;
     let total_height = (max_y - min_y).max(0) as u32;
     let mut master_img = ImageBuffer::new(total_width, total_height);
+
+    // Slot for per-monitor physical images, indexed by position in `monitors`.
+    let mut physical_images: Vec<Option<ImageBuffer<Rgba<u8>, Vec<u8>>>> =
+        vec![None; monitors.len()];
 
     for fi in &state.frames {
         let mmap = fi.mmap.as_ref().ok_or_else(|| {
@@ -556,30 +597,48 @@ pub fn capture_all_monitors(
                 fi.name
             ))
         })?;
-        let mon_info = monitors
+        let (mon_idx, mon_info) = monitors
             .iter()
-            .find(|m| m.name == fi.name)
+            .enumerate()
+            .find(|(_, m)| m.name == fi.name)
             .ok_or_else(|| AppError::Other(format!("Monitor info missing for '{}'", fi.name)))?;
 
+        // --- Physical-resolution image (for HiDPI overlay) ---
+        let mut phys_img = ImageBuffer::new(fi.width, fi.height);
+        for y in 0..fi.height {
+            for x in 0..fi.width {
+                let offset = y as usize * fi.stride as usize + x as usize * 4;
+                phys_img.put_pixel(x, y, read_pixel_rgba(mmap, offset, format));
+            }
+        }
+        physical_images[mon_idx] = Some(phys_img);
+
+        // --- Logical-space composite ---
         let offset_x = (mon_info.rect.x - min_x) as u32;
         let offset_y = (mon_info.rect.y - min_y) as u32;
         let log_w = mon_info.rect.w as u32;
         let log_h = mon_info.rect.h as u32;
 
         // Pre-compute the logical→physical index mapping for each axis.
-        // Using integer arithmetic (lx * fi.width / log_w) avoids per-pixel f64
-        // operations and is exact for nearest-neighbour downsampling.
-        // For 1x scale this degenerates to the identity mapping at zero cost.
+        // Use u64 intermediate to avoid u32 overflow when logical * physical dimensions
+        // exceed 4 GiB (possible on large multi-monitor HiDPI setups).
         let phys_xs: Vec<u32> = (0..log_w)
-            .map(|lx| (lx * fi.width / log_w).min(fi.width.saturating_sub(1)))
+            .map(|lx| {
+                ((lx as u64 * fi.width as u64 / log_w as u64) as u32)
+                    .min(fi.width.saturating_sub(1))
+            })
             .collect();
         let phys_ys: Vec<u32> = (0..log_h)
-            .map(|ly| (ly * fi.height / log_h).min(fi.height.saturating_sub(1)))
+            .map(|ly| {
+                ((ly as u64 * fi.height as u64 / log_h as u64) as u32)
+                    .min(fi.height.saturating_sub(1))
+            })
             .collect();
 
         for (ly, &py) in phys_ys.iter().enumerate() {
             for (lx, &px) in phys_xs.iter().enumerate() {
-                let offset = (py * fi.stride + px * 4) as usize;
+                // Compute offset in usize to avoid u32 overflow on large physical buffers.
+                let offset = py as usize * fi.stride as usize + px as usize * 4;
                 // lx < log_w (u32) and ly < log_h (u32), so usize → u32 never truncates.
                 master_img.put_pixel(
                     offset_x + lx as u32,
@@ -590,5 +649,18 @@ pub fn capture_all_monitors(
         }
     }
 
-    Ok(master_img)
+    let physical_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>> = physical_images
+        .into_iter()
+        .enumerate()
+        .map(|(i, opt)| {
+            opt.ok_or_else(|| {
+                AppError::Other(format!(
+                    "Physical image missing for monitor '{}'",
+                    monitors[i].name
+                ))
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok((physical_images, master_img))
 }
