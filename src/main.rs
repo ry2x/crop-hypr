@@ -1,13 +1,15 @@
 mod capture;
 mod clipboard;
+mod cmd;
 mod config;
+mod error;
 mod freeze;
 mod hyprland;
 mod notify;
 
-use anyhow::Result;
 use clap::{Parser, Subcommand};
 use config::Config;
+use error::{AppError, Result};
 
 #[derive(Parser)]
 #[command(name = "crop-hypr", about = "Hyprland screenshot tool", version)]
@@ -32,22 +34,20 @@ enum Commands {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
+
+    // Load config
     let cfg = Config::load()?;
 
+    // Create save directory during initialization
+    std::fs::create_dir_all(&cfg.save_path)
+        .map_err(|e| AppError::FileSystem(cfg.save_path.clone(), e))?;
+
     match cli.command {
-        Commands::Crop => {
-            if let Some(path) = capture::capture_crop(&cfg)? {
-                finish(path)?;
-            }
-        }
+        Commands::Crop => finish(capture::capture_crop(&cfg)?)?,
         Commands::Window => finish(capture::capture_window(&cfg)?)?,
         Commands::Monitor => finish(capture::capture_monitor(&cfg)?)?,
         Commands::All => finish(capture::capture_all(&cfg)?)?,
-        Commands::Freeze => {
-            if let Some(path) = freeze::run_freeze(&cfg)? {
-                finish(path)?;
-            }
-        }
+        Commands::Freeze => finish(freeze::run_freeze(&cfg)?)?,
     }
 
     Ok(())
@@ -62,9 +62,13 @@ fn finish(path: std::path::PathBuf) -> Result<()> {
 
 fn main() {
     if let Err(e) = run() {
-        let msg = format!("{e:#}");
-        eprintln!("error: {msg}");
-        let _ = notify::notify_error(&msg);
-        std::process::exit(1);
+        if let AppError::UserCancelled = &e {
+            // Exit silently on user cancellation
+            std::process::exit(e.exit_code());
+        }
+
+        eprintln!("error: {}", e);
+        let _ = notify::notify_error(&e.to_string());
+        std::process::exit(e.exit_code());
     }
 }

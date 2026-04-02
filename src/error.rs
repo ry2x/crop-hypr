@@ -1,0 +1,67 @@
+use std::path::PathBuf;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum AppError {
+    #[error("Command not found or failed to spawn: {0}: {1}")]
+    CommandNotFound(String, #[source] std::io::Error),
+
+    #[error("Command {0} failed with exit status: {1}")]
+    CommandFailed(String, std::process::ExitStatus),
+
+    #[error("Hyprland IPC error ({0}): {1}")]
+    HyprlandIpc(String, #[source] std::io::Error),
+
+    #[error("Hyprland IPC environment variable {0} error: {1}")]
+    HyprlandEnvVar(&'static str, #[source] std::env::VarError),
+
+    #[error("Failed to parse JSON from {0}: {1}")]
+    HyprlandJson(String, #[source] serde_json::Error),
+
+    #[error("Failed to parse JSON: {0}")]
+    JsonParse(#[from] serde_json::Error),
+
+    #[error("Invalid configuration: {0}")]
+    Config(String),
+
+    #[error("Failed to load or parse TOML config: {0}")]
+    TomlParse(#[from] toml::de::Error),
+
+    #[error("User cancelled operation")]
+    UserCancelled,
+
+    #[error("Slurp returned empty geometry")]
+    EmptyGeometry,
+
+    #[error("No focused monitor found")]
+    NoFocusedMonitor,
+
+    #[error("Image processing error: {0}")]
+    Image(#[from] image::ImageError),
+
+    #[error("Iced Layershell error: {0}")]
+    LayerShell(String),
+
+    #[error("File system error on path {0}: {1}")]
+    FileSystem(PathBuf, #[source] std::io::Error),
+
+    #[error("Generic I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Other error: {0}")]
+    Other(String),
+}
+
+impl AppError {
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            AppError::CommandNotFound(_, _) => 127,
+            AppError::UserCancelled => 130,
+            AppError::Config(_) | AppError::TomlParse(_) => 2,
+            AppError::EmptyGeometry => 1,
+            _ => 1,
+        }
+    }
+}
+
+pub type Result<T> = std::result::Result<T, AppError>;

@@ -1,121 +1,86 @@
-use anyhow::{Context, Result, bail};
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
 
+use crate::cmd::{self, CMD_GRIM, CMD_SLURP};
 use crate::config::Config;
+use crate::error::{AppError, Result};
 use crate::hyprland;
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-/// Run `slurp` and return the selected geometry string (e.g. "100,200 640x480").
-/// Returns `None` if the user cancelled (slurp exits with code 1).
-fn slurp_region() -> Result<Option<String>> {
-    let output = Command::new("slurp")
+fn slurp_region() -> Result<String> {
+    let output = Command::new(CMD_SLURP)
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()
-        .context("failed to spawn slurp — is it installed?")?;
+        .map_err(|e| AppError::CommandNotFound(CMD_SLURP.to_string(), e))?;
 
     if !output.status.success() {
-        return Ok(None); // cancelled
+        if output.status.code() == Some(1) {
+            return Err(AppError::UserCancelled);
+        } else {
+            return Err(AppError::CommandFailed(
+                CMD_SLURP.to_string(),
+                output.status,
+            ));
+        }
     }
 
     let region = String::from_utf8(output.stdout)
-        .context("slurp output is not valid UTF-8")?
+        .map_err(|_| AppError::Other("slurp output is not valid UTF-8".to_string()))?
         .trim()
         .to_owned();
 
     if region.is_empty() {
-        bail!("slurp returned empty geometry");
+        return Err(AppError::EmptyGeometry);
     }
 
-    Ok(Some(region))
+    Ok(region)
 }
 
-/// Build the output path from config, creating the directory if needed.
-fn make_output_path(cfg: &Config) -> Result<PathBuf> {
-    std::fs::create_dir_all(&cfg.save_path)
-        .with_context(|| format!("failed to create directory: {}", cfg.save_path.display()))?;
-    Ok(cfg.output_path())
-}
-
-/// Invoke `grim` with the given extra args and save to `path`.
 fn run_grim(extra_args: &[&str], path: &std::path::Path) -> Result<()> {
-    let path_str = path.to_str().unwrap();
-    let status = Command::new("grim")
-        .args(extra_args)
-        .arg(path_str)
-        .status()
-        .context("failed to spawn grim — is it installed?")?;
+    let mut args: Vec<&std::ffi::OsStr> = extra_args.iter().map(std::ffi::OsStr::new).collect();
+    args.push(path.as_os_str());
 
-    if !status.success() {
-        bail!("grim exited with non-zero status");
-    }
-    Ok(())
+    cmd::run_cmd_status(CMD_GRIM, &args)
 }
 
-// ── public capture functions ──────────────────────────────────────────────────
-
-/// Capture a user-selected crop region via slurp.
-/// Returns `None` if the user cancelled.
-pub fn capture_crop(cfg: &Config) -> Result<Option<PathBuf>> {
-    let Some(region) = slurp_region()? else {
-        return Ok(None);
-    };
-
-    let path = make_output_path(cfg)?;
+pub fn capture_crop(cfg: &Config) -> Result<PathBuf> {
+    let region = slurp_region()?;
+    let path = cfg.output_path();
     run_grim(&["-g", &region], &path)?;
-    Ok(Some(path))
+    Ok(path)
 }
 
-/// Capture the currently active window using its geometry from hyprctl.
 pub fn capture_window(cfg: &Config) -> Result<PathBuf> {
-    let info = hyprland::hyprland_ipc("activewindow")?;
+    let info = hyprland::get_active_window()?;
 
-    let x = info["at"][0]
-        .as_i64()
-        .context("activewindow: missing at[0]")?;
-    let y = info["at"][1]
-        .as_i64()
-        .context("activewindow: missing at[1]")?;
-    let w = info["size"][0]
-        .as_i64()
-        .context("activewindow: missing size[0]")?;
-    let h = info["size"][1]
-        .as_i64()
-        .context("activewindow: missing size[1]")?;
+    let x = info.at[0];
+    let y = info.at[1];
+    let w = info.size[0];
+    let h = info.size[1];
 
     let region = format!("{x},{y} {w}x{h}");
-    let path = make_output_path(cfg)?;
+    let path = cfg.output_path();
     run_grim(&["-g", &region], &path)?;
     Ok(path)
 }
 
-/// Capture the focused monitor by output name.
 pub fn capture_monitor(cfg: &Config) -> Result<PathBuf> {
-    let monitors = hyprland::hyprland_ipc("monitors")?;
+    let monitors = hyprland::get_monitors()?;
 
     let focused = monitors
-        .as_array()
-        .context("monitors: expected JSON array")?
-        .iter()
-        .find(|m| m["focused"].as_bool().unwrap_or(false))
-        .context("no focused monitor found")?;
+        .into_iter()
+        .find(|m| m.focused)
+        .ok_or(AppError::NoFocusedMonitor)?;
 
-    let name = focused["name"]
-        .as_str()
-        .context("monitor: missing name field")?;
-
-    let path = make_output_path(cfg)?;
-    run_grim(&["-o", name], &path)?;
+    let path = cfg.output_path();
+    run_grim(&["-o", &focused.name], &path)?;
     Ok(path)
 }
 
-/// Capture all monitors (grim default — no geometry flag).
 pub fn capture_all(cfg: &Config) -> Result<PathBuf> {
-    let path = make_output_path(cfg)?;
+    let path = cfg.output_path();
     run_grim(&[], &path)?;
     Ok(path)
 }
