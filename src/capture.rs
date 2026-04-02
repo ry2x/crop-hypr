@@ -115,6 +115,13 @@ pub fn capture_crop(cfg: &Config) -> Result<PathBuf> {
             full_img.height(),
         );
     }
+    if w == 0 || h == 0 {
+        return Err(AppError::Other(format!(
+            "Crop region ({slurp_x},{slurp_y} {req_w}x{req_h}) is entirely outside the image bounds ({}x{})",
+            full_img.width(),
+            full_img.height(),
+        )));
+    }
 
     let cropped = ::image::imageops::crop_imm(&full_img, x, y, w, h).to_image();
     let path = cfg.output_path();
@@ -146,6 +153,12 @@ pub fn capture_window(cfg: &Config) -> Result<PathBuf> {
     let mon_img = screencopy::capture_monitor(&mon.name)?;
 
     // Derive scale from actual frame dimensions (handles HiDPI without a separate field).
+    if mon.rect.w <= 0 || mon.rect.h <= 0 {
+        return Err(AppError::Other(format!(
+            "Monitor '{}' has invalid dimensions ({}x{}) in Hyprland IPC data",
+            mon.name, mon.rect.w, mon.rect.h
+        )));
+    }
     let scale_x = f64::from(mon_img.width()) / f64::from(mon.rect.w);
     let scale_y = f64::from(mon_img.height()) / f64::from(mon.rect.h);
 
@@ -158,6 +171,12 @@ pub fn capture_window(cfg: &Config) -> Result<PathBuf> {
     let phys_y = logical_to_physical(rel_y, scale_y);
     let phys_w = logical_to_physical(win_w, scale_x).min(mon_img.width().saturating_sub(phys_x));
     let phys_h = logical_to_physical(win_h, scale_y).min(mon_img.height().saturating_sub(phys_y));
+
+    if phys_w == 0 || phys_h == 0 {
+        return Err(AppError::Other(
+            "Window crop region is entirely outside the monitor image bounds".to_string(),
+        ));
+    }
 
     let cropped = ::image::imageops::crop_imm(&mon_img, phys_x, phys_y, phys_w, phys_h).to_image();
     let path = cfg.output_path();

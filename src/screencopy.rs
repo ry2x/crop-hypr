@@ -703,8 +703,17 @@ pub fn capture_all_monitors_with_physical(
         // --- Logical-space composite ---
         let offset_x = (mon_info.rect.x - min_x) as u32;
         let offset_y = (mon_info.rect.y - min_y) as u32;
-        let log_w = mon_info.rect.w as u32;
-        let log_h = mon_info.rect.h as u32;
+        let log_w = mon_info.rect.w;
+        let log_h = mon_info.rect.h;
+
+        if log_w <= 0 || log_h <= 0 {
+            return Err(AppError::Other(format!(
+                "Monitor '{}' has invalid dimensions ({}x{}) in Hyprland IPC data",
+                mon_info.name, log_w, log_h
+            )));
+        }
+        let log_w = log_w as u32;
+        let log_h = log_h as u32;
 
         // Pre-compute the logical→physical index mapping for each axis.
         // Use u64 intermediate to avoid u32 overflow when logical * physical dimensions
