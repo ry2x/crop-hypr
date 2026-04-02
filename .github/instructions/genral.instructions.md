@@ -11,12 +11,12 @@
 
 必須ツール・ライブラリ（Backend）:
 
-- `grim` — スクリーンショットのキャプチャ（標準・フォールバック用）
 - `slurp` — 画面上の領域選択
 - `wl-clipboard` — クリップボード連携（`wl-copy` 等）
 - `hyprctl` — ウィンドウ・モニター情報の取得
 - `libnotify`（`notify-send`）— 通知の送信
 - `ashpd`（Rust crate）— xdg-desktop-portal 経由の撮影（必要時）
+- Wayland screencopy: `zwlr_screencopy_manager_v1` プロトコル — 外部ツール不要でネイティブキャプチャ（wlroots系コンポジター対応）
 - UI ライブラリ例: `iced_layershell` 等（Wayland の layer-shell 対応、フリーズモードの選択UI用）
 
 ## 2. 核心機能（Features）
@@ -26,7 +26,7 @@
 #### 即時撮影モード（Immediate）
 
 - `window` — 現在アクティブなウィンドウを撮影
-    - 設定（TOML）により `xdg-desktop-portal`（portal）を使うか、`hyprctl` で座標を取得して `grim` で撮影するかを切り替え可能
+    - 設定（TOML）により `xdg-desktop-portal`（portal）を使うか、`hyprctl` で座標を取得して Wayland screencopy で撮影するかを切り替え可能
 - `monitor` — 現在のモニターを即撮影
 - `all` — 全モニターを連結して撮影
 - `crop` — `slurp` で選択した範囲を撮影
@@ -72,7 +72,7 @@ Windows の Win+Shift+S に相当する高度な対話型モード。
 - 設定ファイルの `window_capture_method` を読み取り、ロジックを分岐
 - `geometry` モード時の例:
     - `hyprctl -j activewindow` から `at`（座標）と `size` を取得
-    - 取得した情報で `grim -g "{x},{y} {w}x{h}"` のような文字列を生成して撮影
+    - 取得した座標を元に `zwlr_screencopy_manager_v1` 経由でモニターをキャプチャし、ウィンドウ領域を切り出す
 
 ## 4. コードスタイル
 

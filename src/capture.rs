@@ -90,8 +90,8 @@ fn logical_to_physical(logical: u32, scale: f64) -> u32 {
 }
 
 pub fn capture_crop(cfg: &Config) -> Result<PathBuf> {
-    // Fetch monitor layout before blocking on slurp so the geometry is consistent
-    // with the captured frame even if the user takes a moment to select.
+    // Fetch monitor layout before blocking on slurp so the layout snapshot used to
+    // interpret slurp's logical coordinates stays stable while the user selects.
     let monitors = hyprland::parse_monitors(hyprland::get_monitors()?);
     let region = slurp_region()?;
     let (slurp_x, slurp_y, req_w, req_h) = parse_slurp_geometry(&region)?;
