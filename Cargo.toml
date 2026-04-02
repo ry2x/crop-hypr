@@ -26,7 +26,7 @@ tempfile = "3.10"
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client", "wayland-client"] }
 wayland-protocols = { version = "0.32", features = ["client", "unstable", "wayland-client"] }
-nix = { version = "0.29", features = ["mman", "fs"] }
+nix = { version = "0.29", features = ["mman", "fs", "poll"] }
 memmap2 = "0.9"
 
 [profile.release]
