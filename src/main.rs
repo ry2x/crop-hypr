@@ -9,7 +9,7 @@ mod notify;
 
 use clap::{Parser, Subcommand};
 use config::Config;
-use error::Result;
+use error::{AppError, Result};
 
 #[derive(Parser)]
 #[command(name = "crop-hypr", about = "Hyprland screenshot tool", version)]
@@ -40,22 +40,14 @@ fn run() -> Result<()> {
 
     // Create save directory during initialization
     std::fs::create_dir_all(&cfg.save_path)
-        .map_err(|e| error::AppError::FileSystem(cfg.save_path.clone(), e))?;
+        .map_err(|e| AppError::FileSystem(cfg.save_path.clone(), e))?;
 
     match cli.command {
-        Commands::Crop => {
-            if let Some(path) = capture::capture_crop(&cfg)? {
-                finish(path)?;
-            }
-        }
+        Commands::Crop => finish(capture::capture_crop(&cfg)?)?,
         Commands::Window => finish(capture::capture_window(&cfg)?)?,
         Commands::Monitor => finish(capture::capture_monitor(&cfg)?)?,
         Commands::All => finish(capture::capture_all(&cfg)?)?,
-        Commands::Freeze => {
-            if let Some(path) = freeze::run_freeze(&cfg)? {
-                finish(path)?;
-            }
-        }
+        Commands::Freeze => finish(freeze::run_freeze(&cfg)?)?,
     }
 
     Ok(())
@@ -70,8 +62,13 @@ fn finish(path: std::path::PathBuf) -> Result<()> {
 
 fn main() {
     if let Err(e) = run() {
+        if let AppError::UserCancelled = e {
+            // Exit silently on user cancellation
+            std::process::exit(e.exit_code());
+        }
+
         eprintln!("error: {}", e);
         let _ = notify::notify_error(&e.to_string());
-        std::process::exit(1);
+        std::process::exit(e.exit_code());
     }
 }

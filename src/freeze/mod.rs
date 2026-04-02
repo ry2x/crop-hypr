@@ -20,7 +20,7 @@ use crate::config::Config;
 use crate::error::{AppError, Result};
 use crate::hyprland::{self, ScreenRect};
 
-pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
+pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let tmp = NamedTempFile::with_suffix(".png")
         .map_err(|e| AppError::Other(format!("failed to create temp file: {}", e)))?;
     let tmp_path = tmp.path().to_owned();
@@ -147,11 +147,11 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
     let selected = result.lock().unwrap().take();
 
     match selected {
-        None => Ok(None),
+        None => Err(AppError::UserCancelled),
         Some(region) => {
             let out_path = cfg.output_path();
             crop_and_save(full_rgba, region, &out_path)?;
-            Ok(Some(out_path))
+            Ok(out_path)
         }
     }
 }

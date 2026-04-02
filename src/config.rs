@@ -47,16 +47,27 @@ impl Config {
     pub fn load() -> Result<Self> {
         let path = config_path();
 
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-
-        let raw = fs::read_to_string(&path).map_err(|e| AppError::FileSystem(path.clone(), e))?;
-
-        let mut cfg: Self = toml::from_str(&raw)?;
+        let mut cfg = if !path.exists() {
+            Self::default()
+        } else {
+            let raw =
+                fs::read_to_string(&path).map_err(|e| AppError::FileSystem(path.clone(), e))?;
+            toml::from_str(&raw)?
+        };
 
         cfg.save_path = expand_tilde(&cfg.save_path);
+        cfg.validate()?;
+
         Ok(cfg)
+    }
+
+    fn validate(&self) -> Result<()> {
+        if self.filename_pattern.trim().is_empty() {
+            return Err(AppError::Config(
+                "filename_pattern cannot be empty".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     pub fn output_filename(&self) -> String {

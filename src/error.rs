@@ -19,13 +19,13 @@ pub enum AppError {
     JsonParse(#[from] serde_json::Error),
 
     #[error("Invalid configuration: {0}")]
-    _Config(String),
+    Config(String),
 
     #[error("Failed to load or parse TOML config: {0}")]
     TomlParse(#[from] toml::de::Error),
 
     #[error("User cancelled operation")]
-    _UserCancelled,
+    UserCancelled,
 
     #[error("Slurp returned empty geometry")]
     EmptyGeometry,
@@ -44,6 +44,18 @@ pub enum AppError {
 
     #[error("Other error: {0}")]
     Other(String),
+}
+
+impl AppError {
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            AppError::CommandNotFound(_, _) => 127,
+            AppError::UserCancelled => 130,
+            AppError::Config(_) | AppError::TomlParse(_) => 2,
+            AppError::EmptyGeometry => 1,
+            _ => 1,
+        }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
