@@ -1,6 +1,6 @@
 [package]
 name = "crop-hypr"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 authors = ["ry2x"]
 description = "A fast, Hyprland-native screenshot tool written in Rust."
@@ -12,7 +12,10 @@ name = "crop-hypr"
 path = "src/main.rs"
 
 [dependencies]
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono = { version = "0.4", default-features = false, features = [
+    "clock",
+    "std",
+] }
 clap = { version = "4", features = ["derive", "wrap_help"] }
 dirs = "5.0"
 image = { version = "0.25", default-features = false, features = ["png"] }
@@ -24,8 +27,15 @@ thiserror = "1.0"
 toml = "0.8"
 tempfile = "3.10"
 wayland-client = "0.31"
-wayland-protocols-wlr = { version = "0.3", features = ["client", "wayland-client"] }
-wayland-protocols = { version = "0.32", features = ["client", "unstable", "wayland-client"] }
+wayland-protocols-wlr = { version = "0.3", features = [
+    "client",
+    "wayland-client",
+] }
+wayland-protocols = { version = "0.32", features = [
+    "client",
+    "unstable",
+    "wayland-client",
+] }
 nix = { version = "0.29", features = ["mman", "fs", "poll"] }
 memmap2 = "0.9"
 
