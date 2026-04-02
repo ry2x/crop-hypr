@@ -1,22 +1,13 @@
-use anyhow::{Context, Result};
-use std::{path::Path, process::Command};
+use std::path::Path;
 
-/// Copy the image at `path` to the Wayland clipboard via `wl-copy`.
+use crate::cmd::{CMD_WL_COPY, run_cmd_status_with_stdin};
+use crate::error::{AppError, Result};
+
 pub fn copy_to_clipboard(path: &Path) -> Result<()> {
-    let status = Command::new("wl-copy")
-        .args(["--type", "image/png"])
-        .stdin(std::fs::File::open(path).with_context(|| {
-            format!(
-                "failed to open screenshot for clipboard: {}",
-                path.display()
-            )
-        })?)
-        .status()
-        .context("failed to spawn wl-copy — is wl-clipboard installed?")?;
+    let file =
+        std::fs::File::open(path).map_err(|e| AppError::FileSystem(path.to_path_buf(), e))?;
 
-    if !status.success() {
-        anyhow::bail!("wl-copy exited with non-zero status");
-    }
+    run_cmd_status_with_stdin(CMD_WL_COPY, &["--type", "image/png"], file)?;
 
     Ok(())
 }

@@ -1,27 +1,24 @@
-use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
+
+use crate::error::{AppError, Result};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WindowCaptureMethod {
     #[default]
     Geometry,
-    // TODO: implement xdg-desktop-portal (ashpd) based window capture
     Portal,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    /// Directory where screenshots are saved.
     #[serde(default = "default_save_path")]
     pub save_path: PathBuf,
 
-    /// How to capture individual windows.
     #[serde(default)]
     pub window_capture_method: WindowCaptureMethod,
 
-    /// strftime-style filename template (no extension).
     #[serde(default = "default_filename_pattern")]
     pub filename_pattern: String,
 }
@@ -54,17 +51,14 @@ impl Config {
             return Ok(Self::default());
         }
 
-        let raw = fs::read_to_string(&path)
-            .with_context(|| format!("Failed to read config at {}", path.display()))?;
+        let raw = fs::read_to_string(&path).map_err(|e| AppError::FileSystem(path.clone(), e))?;
 
-        let mut cfg: Self = toml::from_str(&raw)
-            .with_context(|| format!("Failed to parse config at {}", path.display()))?;
+        let mut cfg: Self = toml::from_str(&raw)?;
 
         cfg.save_path = expand_tilde(&cfg.save_path);
         Ok(cfg)
     }
 
-    /// Expand `filename_pattern` with current timestamp and append `.png`.
     pub fn output_filename(&self) -> String {
         let ts = chrono::Local::now()
             .format(&self.filename_pattern)
@@ -72,7 +66,6 @@ impl Config {
         format!("{ts}.png")
     }
 
-    /// Full path for the next screenshot.
     pub fn output_path(&self) -> PathBuf {
         self.save_path.join(self.output_filename())
     }

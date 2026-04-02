@@ -1,28 +1,31 @@
-use anyhow::{Context, Result};
-use std::{path::Path, process::Command};
+use std::path::Path;
+
+use crate::cmd::{CMD_NOTIFY_SEND, run_cmd_status};
+use crate::error::Result;
 
 pub fn notify_success(path: &Path) {
     let path_str = path.display().to_string();
-    let _ = Command::new("notify-send")
-        .args([
+    let _ = run_cmd_status(
+        CMD_NOTIFY_SEND,
+        &[
             "--app-name=crop-hypr",
             &format!("--icon={path_str}"),
             "Screenshot saved",
             &path_str,
-        ])
-        .status();
+        ],
+    );
 }
 
 pub fn notify_error(msg: &str) -> Result<()> {
-    Command::new("notify-send")
-        .args([
+    run_cmd_status(
+        CMD_NOTIFY_SEND,
+        &[
             "--app-name=crop-hypr",
             "--icon=dialog-error",
             "--urgency=critical",
             "Screenshot failed",
             msg,
-        ])
-        .status()
-        .context("failed to spawn notify-send")?;
+        ],
+    )?;
     Ok(())
 }

@@ -12,11 +12,7 @@ name = "crop-hypr"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0"
-chrono = { version = "0.4", default-features = false, features = [
-    "clock",
-    "std",
-] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4", features = ["derive", "wrap_help"] }
 dirs = "5.0"
 image = { version = "0.25", default-features = false, features = ["png"] }
@@ -24,6 +20,7 @@ iced = { version = "0.14", features = ["image", "canvas", "wgpu"] }
 iced_layershell = "0.16"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+thiserror = "1.0"
 toml = "0.8"
 tempfile = "3.10"
 

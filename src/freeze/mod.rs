@@ -1,6 +1,5 @@
 mod app;
 
-use anyhow::{Context, Result};
 use app::{AppState, Message, app_subscription, app_update, app_view};
 use iced::Task;
 use iced::widget::image as iced_image;
@@ -16,61 +15,45 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+use crate::cmd::CMD_GRIM;
 use crate::config::Config;
+use crate::error::{AppError, Result};
 use crate::hyprland::{self, ScreenRect};
 
-/// Full freeze-mode flow:
-/// 1. Capture all monitors to a single composite PNG via grim
-/// 2. Pre-decode the image and crop one handle per monitor (avoids async loading lag)
-/// 3. Launch iced_layershell daemon — initial window on focused monitor,
-///    extra windows spawned at boot for every other monitor
-/// 4. Each window renders only its monitor's slice of the screenshot
-/// 5. Crop the composite PNG to the selected region and save
-///
-/// Returns the saved path, or `None` if the user cancelled.
 pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
-    // ── Step 1: capture + metadata (parallel) ────────────────────────────────
-    let tmp = NamedTempFile::with_suffix(".png").context("failed to create temp file")?;
+    let tmp = NamedTempFile::with_suffix(".png")
+        .map_err(|e| AppError::Other(format!("failed to create temp file: {}", e)))?;
     let tmp_path = tmp.path().to_owned();
 
-    // Spawn grim without waiting so IPC queries can run concurrently.
-    let mut grim_child = Command::new("grim")
-        .arg(tmp_path.to_str().unwrap())
+    let tmp_path_str = tmp_path
+        .to_str()
+        .ok_or_else(|| AppError::Other("Temp path contains invalid UTF-8".to_string()))?;
+
+    let mut grim_child = Command::new(CMD_GRIM)
+        .arg(tmp_path_str)
         .spawn()
-        .context("failed to spawn grim")?;
+        .map_err(|e| AppError::CommandNotFound(CMD_GRIM.to_string(), e))?;
 
-    // Fetch raw monitor + client JSON via Hyprland IPC socket in parallel.
-    let monitors_t = std::thread::spawn(|| hyprland::hyprland_ipc("monitors"));
-    let clients_t = std::thread::spawn(|| hyprland::hyprland_ipc("clients"));
+    let monitors_t = std::thread::spawn(|| hyprland::get_monitors());
+    let clients_t = std::thread::spawn(|| hyprland::get_clients());
 
-    let grim_status = grim_child.wait().context("grim wait failed")?;
+    let grim_status = grim_child
+        .wait()
+        .map_err(|e| AppError::Other(format!("grim wait failed: {}", e)))?;
+
     if !grim_status.success() {
-        anyhow::bail!("grim failed to capture screen");
+        return Err(AppError::CommandFailed(CMD_GRIM.to_string(), grim_status));
     }
 
-    let monitors_raw = monitors_t
-        .join()
-        .expect("monitors thread panicked")
-        .unwrap_or_default();
-    let clients_raw = clients_t
-        .join()
-        .expect("clients thread panicked")
-        .unwrap_or_default();
+    let monitors_raw = monitors_t.join().expect("monitors thread panicked")?;
+    let clients_raw = clients_t.join().expect("clients thread panicked")?;
 
-    // ── Step 2: decode image + build per-monitor handles ─────────────────────
     let monitors = hyprland::parse_monitors(monitors_raw);
     let active_ws_ids: Vec<i64> = monitors.iter().map(|m| m.active_workspace_id).collect();
     let windows = hyprland::parse_windows(clients_raw, &active_ws_ids);
 
-    // Decode once and convert to RGBA8 upfront.
-    // grim outputs RGB PNG; converting the full image here avoids a per-monitor
-    // channel conversion inside the crop loop.
-    let full_rgba = ::image::open(&tmp_path)
-        .context("failed to decode screenshot")?
-        .into_rgba8();
+    let full_rgba = ::image::open(&tmp_path)?.into_rgba8();
 
-    // Build a per-monitor image handle pre-decoded as RGBA bytes so iced
-    // renders it immediately (no async loading stall on first frame)
     let monitor_images: Vec<iced_image::Handle> = monitors
         .iter()
         .map(|m| {
@@ -83,26 +66,19 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
         })
         .collect();
 
-    // Index of the focused monitor (fallback: 0)
     let focused_monitor_idx = monitors.iter().position(|m| m.focused).unwrap_or(0);
 
-    // Focused monitor size for daemon's required `size` field
     let (fw, fh) = {
         let m = &monitors[focused_monitor_idx];
         (m.rect.w as u32, m.rect.h as u32)
     };
 
-    // ── Step 3: launch overlay UI ─────────────────────────────────────────────
     let result: Arc<Mutex<Option<Option<ScreenRect>>>> = Arc::new(Mutex::new(None));
 
     {
         let result_clone = result.clone();
-
-        // Build window_to_monitor map for non-focused monitors.
-        // We create IcedIds here so we can tell app_view which monitor each window is on.
         let mut window_to_monitor: HashMap<IcedId, usize> = HashMap::new();
 
-        // Pre-build (IcedId, settings) pairs — Task can't be cloned but these can
         let extra_specs: Vec<(IcedId, NewLayerShellSettings)> = monitors
             .iter()
             .enumerate()
@@ -161,22 +137,18 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
             anchor: Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right,
             exclusive_zone: -1,
             keyboard_interactivity: KeyboardInteractivity::Exclusive,
-            // daemon() requires an explicit size; compositor overrides it to the
-            // actual monitor dimensions because we anchor to all four edges
             size: Some((fw, fh)),
             ..Default::default()
         })
         .run()
-        .context("overlay UI failed")?;
+        .map_err(|_| AppError::LayerShell)?;
     }
 
-    // ── Step 4: read result ───────────────────────────────────────────────────
     let selected = result.lock().unwrap().take();
 
     match selected {
-        None => Ok(None), // cancelled
+        None => Ok(None),
         Some(region) => {
-            std::fs::create_dir_all(&cfg.save_path)?;
             let out_path = cfg.output_path();
             crop_and_save(full_rgba, region, &out_path)?;
             Ok(Some(out_path))
@@ -202,5 +174,5 @@ fn crop_and_save(
         }
     };
 
-    cropped.save(dst).context("failed to save cropped image")
+    cropped.save(dst).map_err(AppError::from)
 }

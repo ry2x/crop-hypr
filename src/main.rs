@@ -1,13 +1,15 @@
 mod capture;
 mod clipboard;
+mod cmd;
 mod config;
+mod error;
 mod freeze;
 mod hyprland;
 mod notify;
 
-use anyhow::Result;
 use clap::{Parser, Subcommand};
 use config::Config;
+use error::Result;
 
 #[derive(Parser)]
 #[command(name = "crop-hypr", about = "Hyprland screenshot tool", version)]
@@ -32,7 +34,13 @@ enum Commands {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
-    let cfg = Config::load()?;
+
+    // Create config dir and load config
+    let mut cfg = Config::load()?;
+
+    // Create save directory during initialization
+    std::fs::create_dir_all(&cfg.save_path)
+        .map_err(|e| error::AppError::FileSystem(cfg.save_path.clone(), e))?;
 
     match cli.command {
         Commands::Crop => {
@@ -62,9 +70,8 @@ fn finish(path: std::path::PathBuf) -> Result<()> {
 
 fn main() {
     if let Err(e) = run() {
-        let msg = format!("{e:#}");
-        eprintln!("error: {msg}");
-        let _ = notify::notify_error(&msg);
+        eprintln!("error: {}", e);
+        let _ = notify::notify_error(&e.to_string());
         std::process::exit(1);
     }
 }
