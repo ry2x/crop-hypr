@@ -7,7 +7,7 @@ pub fn notify_success(path: &Path) {
     let path_str = path.display().to_string();
     let _ = run_cmd_status(
         CMD_NOTIFY_SEND,
-        &[
+        [
             "--app-name=crop-hypr",
             &format!("--icon={path_str}"),
             "Screenshot saved",
@@ -19,7 +19,7 @@ pub fn notify_success(path: &Path) {
 pub fn notify_error(msg: &str) -> Result<()> {
     run_cmd_status(
         CMD_NOTIFY_SEND,
-        &[
+        [
             "--app-name=crop-hypr",
             "--icon=dialog-error",
             "--urgency=critical",

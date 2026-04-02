@@ -36,7 +36,7 @@ fn run() -> Result<()> {
     let cli = Cli::parse();
 
     // Create config dir and load config
-    let mut cfg = Config::load()?;
+    let cfg = Config::load()?;
 
     // Create save directory during initialization
     std::fs::create_dir_all(&cfg.save_path)

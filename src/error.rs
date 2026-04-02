@@ -19,13 +19,13 @@ pub enum AppError {
     JsonParse(#[from] serde_json::Error),
 
     #[error("Invalid configuration: {0}")]
-    Config(String),
+    _Config(String),
 
     #[error("Failed to load or parse TOML config: {0}")]
     TomlParse(#[from] toml::de::Error),
 
     #[error("User cancelled operation")]
-    UserCancelled,
+    _UserCancelled,
 
     #[error("Slurp returned empty geometry")]
     EmptyGeometry,

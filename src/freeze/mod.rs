@@ -34,8 +34,8 @@ pub fn run_freeze(cfg: &Config) -> Result<Option<PathBuf>> {
         .spawn()
         .map_err(|e| AppError::CommandNotFound(CMD_GRIM.to_string(), e))?;
 
-    let monitors_t = std::thread::spawn(|| hyprland::get_monitors());
-    let clients_t = std::thread::spawn(|| hyprland::get_clients());
+    let monitors_t = std::thread::spawn(hyprland::get_monitors);
+    let clients_t = std::thread::spawn(hyprland::get_clients);
 
     let grim_status = grim_child
         .wait()

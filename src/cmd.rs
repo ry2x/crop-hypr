@@ -8,7 +8,7 @@ pub const CMD_SLURP: &str = "slurp";
 pub const CMD_WL_COPY: &str = "wl-copy";
 pub const CMD_NOTIFY_SEND: &str = "notify-send";
 
-pub fn run_cmd_output<I, S>(cmd: &str, args: I) -> Result<Output>
+pub fn _run_cmd_output<I, S>(cmd: &str, args: I) -> Result<Output>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
