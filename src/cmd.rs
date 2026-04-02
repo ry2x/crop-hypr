@@ -3,7 +3,6 @@ use std::process::{Command, Stdio};
 
 use crate::error::{AppError, Result};
 
-pub const CMD_GRIM: &str = "grim";
 pub const CMD_SLURP: &str = "slurp";
 pub const CMD_WL_COPY: &str = "wl-copy";
 pub const CMD_NOTIFY_SEND: &str = "notify-send";
