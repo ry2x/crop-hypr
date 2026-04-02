@@ -35,7 +35,7 @@ enum Commands {
 fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    // Create config dir and load config
+    // Load config
     let cfg = Config::load()?;
 
     // Create save directory during initialization

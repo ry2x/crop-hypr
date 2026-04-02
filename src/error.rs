@@ -3,17 +3,17 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
-    #[error("Command not found or failed to spawn: {0}")]
+    #[error("Command not found or failed to spawn: {0}: {1}")]
     CommandNotFound(String, #[source] std::io::Error),
 
     #[error("Command {0} failed with exit status: {1}")]
     CommandFailed(String, std::process::ExitStatus),
 
-    #[error("Hyprland IPC error: {0}")]
-    HyprlandIpc(#[from] std::io::Error),
+    #[error("Hyprland IPC error ({0}): {1}")]
+    HyprlandIpc(String, #[source] std::io::Error),
 
-    #[error("Hyprland IPC environment variable missing: {0}")]
-    HyprlandEnvVar(#[from] std::env::VarError),
+    #[error("Hyprland IPC environment variable {0} error: {1}")]
+    HyprlandEnvVar(&'static str, #[source] std::env::VarError),
 
     #[error("Failed to parse JSON: {0}")]
     JsonParse(#[from] serde_json::Error),
@@ -36,8 +36,8 @@ pub enum AppError {
     #[error("Image processing error: {0}")]
     Image(#[from] image::ImageError),
 
-    #[error("Iced Layershell error")]
-    LayerShell,
+    #[error("Iced Layershell error: {0}")]
+    LayerShell(String),
 
     #[error("File system error on path {0}: {1}")]
     FileSystem(PathBuf, #[source] std::io::Error),

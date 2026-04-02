@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Stdio};
 
 use crate::error::{AppError, Result};
 
@@ -7,19 +7,6 @@ pub const CMD_GRIM: &str = "grim";
 pub const CMD_SLURP: &str = "slurp";
 pub const CMD_WL_COPY: &str = "wl-copy";
 pub const CMD_NOTIFY_SEND: &str = "notify-send";
-
-pub fn _run_cmd_output<I, S>(cmd: &str, args: I) -> Result<Output>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let output = Command::new(cmd)
-        .args(args)
-        .output()
-        .map_err(|e| AppError::CommandNotFound(cmd.to_string(), e))?;
-
-    Ok(output)
-}
 
 pub fn run_cmd_status<I, S>(cmd: &str, args: I) -> Result<()>
 where

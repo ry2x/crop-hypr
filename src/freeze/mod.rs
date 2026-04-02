@@ -141,7 +141,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
             ..Default::default()
         })
         .run()
-        .map_err(|_| AppError::LayerShell)?;
+        .map_err(|e| AppError::LayerShell(e.to_string()))?;
     }
 
     let selected = result.lock().unwrap().take();

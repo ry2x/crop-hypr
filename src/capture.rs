@@ -16,7 +16,14 @@ fn slurp_region() -> Result<String> {
         .map_err(|e| AppError::CommandNotFound(CMD_SLURP.to_string(), e))?;
 
     if !output.status.success() {
-        return Err(AppError::UserCancelled);
+        if output.status.code() == Some(1) {
+            return Err(AppError::UserCancelled);
+        } else {
+            return Err(AppError::CommandFailed(
+                CMD_SLURP.to_string(),
+                output.status,
+            ));
+        }
     }
 
     let region = String::from_utf8(output.stdout)
