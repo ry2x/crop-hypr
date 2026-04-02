@@ -10,9 +10,11 @@ use wayland_protocols_wlr::screencopy::v1::client::{
 use crate::error::{AppError, Result};
 use image::{ImageBuffer, Rgba};
 use memmap2::MmapMut;
+use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 use nix::sys::memfd;
 use std::ffi::CString;
 use std::os::fd::AsFd;
+use std::time::{Duration, Instant};
 
 pub struct CaptureState {
     pub shm: Option<wl_shm::WlShm>,
@@ -132,6 +134,56 @@ fn init_wayland() -> Result<(EventQueue<CaptureState>, CaptureState)> {
     Ok((event_queue, state))
 }
 
+/// Drive the event queue until `done` returns `true`, or until `timeout` elapses.
+///
+/// Uses `prepare_read` + `poll` so the thread yields to the OS rather than
+/// spinning, and returns an error instead of hanging forever if the compositor
+/// stops responding (e.g. because an output was removed mid-capture).
+fn dispatch_until(
+    event_queue: &mut EventQueue<CaptureState>,
+    state: &mut CaptureState,
+    timeout: Duration,
+    mut done: impl FnMut(&CaptureState) -> bool,
+) -> Result<()> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        event_queue
+            .dispatch_pending(state)
+            .map_err(|e| AppError::Other(format!("Wayland dispatch failed: {e}")))?;
+
+        if done(state) {
+            return Ok(());
+        }
+
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(AppError::Other(
+                "Screencopy timed out: compositor did not respond in time".to_string(),
+            ));
+        }
+
+        event_queue
+            .flush()
+            .map_err(|e| AppError::Other(format!("Wayland flush failed: {e}")))?;
+
+        // Prepare a socket read.  Guard and fd are both immutable borrows of event_queue;
+        // they coexist safely since Rust allows multiple &self borrows simultaneously.
+        // Drop pollfds (and its BorrowedFd) before consuming the guard — the borrow checker
+        // requires both immutable borrows to end before the next dispatch_pending(&mut self).
+        let timeout_ms = remaining.as_millis().min(u16::MAX as u128) as u16;
+        let guard = event_queue.prepare_read();
+        {
+            let fd = event_queue.as_fd();
+            let mut pollfds = [PollFd::new(fd, PollFlags::POLLIN)];
+            let _ = poll(&mut pollfds, PollTimeout::from(timeout_ms));
+            // pollfds (and BorrowedFd) dropped here; immutable borrow 2 ends.
+        }
+        if let Some(g) = guard {
+            let _ = g.read(); // consumes guard; immutable borrow 1 ends.
+        }
+    }
+}
+
 // --- Dispatch impls ---
 
 impl Dispatch<wl_registry::WlRegistry, ()> for CaptureState {
@@ -144,12 +196,17 @@ impl Dispatch<wl_registry::WlRegistry, ()> for CaptureState {
         qh: &QueueHandle<Self>,
     ) {
         if let wl_registry::Event::Global {
-            name, interface, ..
+            name,
+            interface,
+            version,
         } = event
         {
             match interface.as_str() {
                 "wl_output" => {
-                    let output = registry.bind::<wl_output::WlOutput, _, _>(name, 1, qh, ());
+                    // Bind at the version the compositor advertises, capped at v1.
+                    // We only need basic output enumeration; xdg_output handles naming.
+                    let output =
+                        registry.bind::<wl_output::WlOutput, _, _>(name, version.min(1), qh, ());
                     state.outputs.push(OutputInfo {
                         output,
                         name: None,
@@ -157,23 +214,26 @@ impl Dispatch<wl_registry::WlRegistry, ()> for CaptureState {
                     });
                 }
                 "wl_shm" => {
-                    state.shm = Some(registry.bind::<wl_shm::WlShm, _, _>(name, 1, qh, ()));
+                    state.shm =
+                        Some(registry.bind::<wl_shm::WlShm, _, _>(name, version.min(1), qh, ()));
                 }
                 "zwlr_screencopy_manager_v1" => {
                     state.screencopy_manager = Some(
                         registry.bind::<zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1, _, _>(
                             name,
-                            1,
+                            version.min(1),
                             qh,
                             (),
                         ),
                     );
                 }
                 "zxdg_output_manager_v1" => {
+                    // Cap at v3 (crate maximum); bind only what the compositor supports
+                    // to avoid a protocol error on compositors that expose v1/v2 only.
                     state.xdg_output_manager = Some(
                         registry.bind::<zxdg_output_manager_v1::ZxdgOutputManagerV1, _, _>(
                             name,
-                            3,
+                            version.min(3),
                             qh,
                             (),
                         ),
@@ -457,15 +517,10 @@ pub fn capture_monitor(monitor_name: &str) -> Result<RgbaImage> {
         name: monitor_name.to_string(),
     });
 
-    loop {
-        event_queue
-            .blocking_dispatch(&mut state)
-            .map_err(|e| AppError::Other(format!("Wayland dispatch failed: {e}")))?;
-        let fi = &state.frames[0];
-        if fi.ready || fi.failed {
-            break;
-        }
-    }
+    dispatch_until(&mut event_queue, &mut state, Duration::from_secs(10), |s| {
+        let fi = &s.frames[0];
+        fi.ready || fi.failed
+    })?;
 
     let fi = &state.frames[0];
     if fi.failed {
@@ -563,14 +618,9 @@ pub fn capture_all_monitors_with_physical(
         )));
     }
 
-    loop {
-        event_queue
-            .blocking_dispatch(&mut state)
-            .map_err(|e| AppError::Other(format!("Wayland dispatch failed: {e}")))?;
-        if state.frames.iter().all(|f| f.ready || f.failed) {
-            break;
-        }
-    }
+    dispatch_until(&mut event_queue, &mut state, Duration::from_secs(10), |s| {
+        s.frames.iter().all(|f| f.ready || f.failed)
+    })?;
 
     let failures: Vec<String> = state
         .frames
