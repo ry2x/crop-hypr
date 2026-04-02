@@ -6,6 +6,7 @@ mod error;
 mod freeze;
 mod hyprland;
 mod notify;
+mod screencopy;
 
 use clap::{Parser, Subcommand};
 use config::Config;

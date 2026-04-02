@@ -151,7 +151,7 @@ impl canvas::Program<Message> for SelectionCanvas {
                     state.phase = DrawPhase::Idle;
                     let local_rect = points_to_rect(start, state.cursor);
                     if local_rect.w >= 5 && local_rect.h >= 5 {
-                        // Convert canvas-local coords to global for grim
+                        // Convert canvas-local coords to global logical space for crop
                         let global_rect = ScreenRect {
                             x: local_rect.x + self.monitor_offset.x as i32,
                             y: local_rect.y + self.monitor_offset.y as i32,

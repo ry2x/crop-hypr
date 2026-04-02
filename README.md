@@ -16,10 +16,12 @@ The following tools must be available on `$PATH`:
 
 | Tool | Purpose |
 | ---- | ------- |
-| `grim` | Screen capture |
 | `slurp` | Interactive region selection (crop mode) |
 | `wl-copy` | Copy image to Wayland clipboard |
 | `notify-send` | Desktop notifications (optional) |
+
+Screen capture is performed natively via the **`zwlr_screencopy_manager_v1`** Wayland protocol
+(wlroots-based compositors: Hyprland, sway, etc.) — no external capture tool is required.
 
 Window and monitor metadata is fetched directly via the **Hyprland IPC socket**
 (`$XDG_RUNTIME_DIR/hypr/<sig>/.socket.sock`).
@@ -90,7 +92,7 @@ save_path = "~/Pictures/Screenshots"
 filename_pattern = "screenshot_%Y-%m-%d_%H-%M-%S"
 
 # How individual windows are captured.
-# "geometry" — use hyprctl to get window coordinates, then grim (default)
+# "geometry" — use Hyprland IPC to get window coordinates, then capture via Wayland screencopy (default)
 # "portal"   — xdg-desktop-portal based capture (TODO: not yet implemented)
 window_capture_method = "geometry"
 ```
