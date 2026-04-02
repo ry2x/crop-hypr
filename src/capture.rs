@@ -39,12 +39,8 @@ fn slurp_region() -> Result<String> {
 }
 
 fn run_grim(extra_args: &[&str], path: &std::path::Path) -> Result<()> {
-    let path_str = path
-        .to_str()
-        .ok_or_else(|| AppError::Other("Output path contains invalid UTF-8".to_string()))?;
-
-    let mut args: Vec<&str> = extra_args.to_vec();
-    args.push(path_str);
+    let mut args: Vec<&std::ffi::OsStr> = extra_args.iter().map(std::ffi::OsStr::new).collect();
+    args.push(path.as_os_str());
 
     cmd::run_cmd_status(CMD_GRIM, &args)
 }

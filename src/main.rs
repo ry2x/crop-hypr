@@ -62,7 +62,7 @@ fn finish(path: std::path::PathBuf) -> Result<()> {
 
 fn main() {
     if let Err(e) = run() {
-        if let AppError::UserCancelled = e {
+        if let AppError::UserCancelled = &e {
             // Exit silently on user cancellation
             std::process::exit(e.exit_code());
         }

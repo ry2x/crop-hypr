@@ -15,6 +15,9 @@ pub enum AppError {
     #[error("Hyprland IPC environment variable {0} error: {1}")]
     HyprlandEnvVar(&'static str, #[source] std::env::VarError),
 
+    #[error("Failed to parse JSON from {0}: {1}")]
+    HyprlandJson(String, #[source] serde_json::Error),
+
     #[error("Failed to parse JSON: {0}")]
     JsonParse(#[from] serde_json::Error),
 
@@ -41,6 +44,9 @@ pub enum AppError {
 
     #[error("File system error on path {0}: {1}")]
     FileSystem(PathBuf, #[source] std::io::Error),
+
+    #[error("Generic I/O error: {0}")]
+    Io(#[from] std::io::Error),
 
     #[error("Other error: {0}")]
     Other(String),

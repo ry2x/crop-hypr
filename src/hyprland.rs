@@ -91,7 +91,8 @@ pub fn hyprland_ipc_raw(cmd: &str) -> Result<Vec<u8>> {
 
 pub fn hyprland_ipc<T: for<'de> Deserialize<'de>>(cmd: &str) -> Result<T> {
     let buf = hyprland_ipc_raw(cmd)?;
-    let parsed: T = serde_json::from_slice(&buf)?;
+    let parsed: T =
+        serde_json::from_slice(&buf).map_err(|e| AppError::HyprlandJson(cmd.to_string(), e))?;
     Ok(parsed)
 }
 

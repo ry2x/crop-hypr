@@ -37,9 +37,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
     let clients_t = std::thread::spawn(hyprland::get_clients);
 
-    let grim_status = grim_child
-        .wait()
-        .map_err(|e| AppError::Other(format!("grim wait failed: {}", e)))?;
+    let grim_status = grim_child.wait().map_err(AppError::from)?;
 
     if !grim_status.success() {
         return Err(AppError::CommandFailed(CMD_GRIM.to_string(), grim_status));
