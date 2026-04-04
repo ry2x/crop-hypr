@@ -45,6 +45,12 @@ pub struct FrameInfo {
     pub name: String,
 }
 
+impl Default for CaptureState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CaptureState {
     pub fn new() -> Self {
         Self {

@@ -125,7 +125,10 @@ pub fn parse_monitors(monitors: Vec<HyprMonitor>) -> Vec<MonitorInfo> {
         .collect()
 }
 
-pub fn parse_windows(clients: Vec<HyprClient>, active_workspace_ids: &[i64]) -> Vec<WindowInfo> {
+pub(crate) fn parse_windows(
+    clients: Vec<HyprClient>,
+    active_workspace_ids: &[i64],
+) -> Vec<WindowInfo> {
     clients
         .into_iter()
         .filter_map(|c| {
@@ -151,4 +154,64 @@ pub fn parse_windows(clients: Vec<HyprClient>, active_workspace_ids: &[i64]) -> 
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_monitor_parsing() {
+        let monitors = vec![HyprMonitor {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+            name: "DP-1".to_string(),
+            focused: true,
+            active_workspace: HyprWorkspace { id: 1 },
+        }];
+
+        let parsed = parse_monitors(monitors);
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].name, "DP-1");
+        assert_eq!(parsed[0].rect.w, 1920);
+        assert!(parsed[0].focused);
+        assert_eq!(parsed[0].active_workspace_id, 1);
+    }
+
+    #[test]
+    fn test_window_parsing() {
+        let clients = vec![
+            HyprClient {
+                hidden: false,
+                workspace: HyprWorkspace { id: 1 },
+                at: [100, 100],
+                size: [800, 600],
+                title: "Visible Window".to_string(),
+            },
+            HyprClient {
+                hidden: true,
+                workspace: HyprWorkspace { id: 1 },
+                at: [200, 200],
+                size: [800, 600],
+                title: "Hidden Window".to_string(),
+            },
+            HyprClient {
+                hidden: false,
+                workspace: HyprWorkspace { id: 2 },
+                at: [300, 300],
+                size: [800, 600],
+                title: "Other Workspace Window".to_string(),
+            },
+        ];
+
+        let active_workspaces = vec![1];
+        let parsed = parse_windows(clients, &active_workspaces);
+
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].title, "Visible Window");
+        assert_eq!(parsed[0].rect.x, 100);
+        assert_eq!(parsed[0].rect.w, 800);
+    }
 }

@@ -1,16 +1,7 @@
-mod capture;
-mod clipboard;
-mod cmd;
-mod config;
-mod error;
-mod freeze;
-mod hyprland;
-mod notify;
-mod screencopy;
-
 use clap::{Parser, Subcommand};
-use config::Config;
-use error::{AppError, Result};
+use crop_hypr::config::Config;
+use crop_hypr::error::{AppError, Result};
+use crop_hypr::{capture, clipboard, freeze, notify};
 
 #[derive(Parser)]
 #[command(name = "crop-hypr", about = "Hyprland screenshot tool", version)]
