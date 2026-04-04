@@ -1,0 +1,9 @@
+pub mod capture;
+pub mod clipboard;
+pub mod cmd;
+pub mod config;
+pub mod error;
+pub mod freeze;
+pub mod hyprland;
+pub mod notify;
+pub mod screencopy;

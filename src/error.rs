@@ -65,3 +65,35 @@ impl AppError {
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+
+    #[test]
+    fn test_error_exit_codes() {
+        // Command not found -> 127
+        let err = AppError::CommandNotFound(
+            "test".to_string(),
+            io::Error::new(io::ErrorKind::NotFound, "not found"),
+        );
+        assert_eq!(err.exit_code(), 127);
+
+        // User cancelled -> 130
+        let err = AppError::UserCancelled;
+        assert_eq!(err.exit_code(), 130);
+
+        // Config error -> 2
+        let err = AppError::Config("test".to_string());
+        assert_eq!(err.exit_code(), 2);
+
+        // Empty geometry -> 1
+        let err = AppError::EmptyGeometry;
+        assert_eq!(err.exit_code(), 1);
+
+        // Generic IO -> 1
+        let err = AppError::Io(io::Error::other("io error"));
+        assert_eq!(err.exit_code(), 1);
+    }
+}

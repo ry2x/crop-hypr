@@ -109,3 +109,64 @@ fn expand_tilde(path: &std::path::Path) -> PathBuf {
             .join(expanded)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let cfg = Config::default();
+        assert!(cfg.save_path.to_string_lossy().contains("Screenshots"));
+        assert_eq!(cfg.filename_pattern, "hyprsnap_%Y%m%d_%H%M%S");
+        match cfg.window_capture_method {
+            WindowCaptureMethod::Geometry => (),
+            _ => panic!("Default window capture method should be Geometry"),
+        }
+    }
+
+    #[test]
+    fn test_config_validation() {
+        // Valid config
+        let cfg: Config = toml::from_str("filename_pattern = 'test'").unwrap();
+        assert!(cfg.validate().is_ok());
+
+        // Invalid config (empty pattern)
+        let cfg: Config = toml::from_str("filename_pattern = ''").unwrap();
+        let res = cfg.validate();
+        assert!(res.is_err());
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("filename_pattern cannot be empty")
+        );
+
+        let cfg2: Config = toml::from_str("filename_pattern = '   '").unwrap();
+        assert!(cfg2.validate().is_err());
+    }
+
+    #[test]
+    fn test_tilde_expansion() {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+
+        // Case 1: ~/path
+        let path = PathBuf::from("~/test/dir");
+        let expanded = expand_tilde(&path);
+        assert_eq!(expanded, home.join("test/dir"));
+
+        // Case 2: ~
+        let path = PathBuf::from("~");
+        let expanded = expand_tilde(&path);
+        assert_eq!(expanded, home);
+
+        // Case 3: Absolute path
+        let path = PathBuf::from("/tmp/test");
+        let expanded = expand_tilde(&path);
+        assert_eq!(expanded, PathBuf::from("/tmp/test"));
+
+        // Case 4: Relative path (currently relative to home based on expand_tilde implementation)
+        let path = PathBuf::from("Screenshots");
+        let expanded = expand_tilde(&path);
+        assert_eq!(expanded, home.join("Screenshots"));
+    }
+}
