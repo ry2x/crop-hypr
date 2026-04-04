@@ -42,29 +42,34 @@ fn slurp_region() -> Result<String> {
 ///
 /// `x` and `y` are signed because multi-monitor setups can place monitors at
 /// negative logical coordinates (e.g. a monitor to the left of the primary at `−1920,0`).
-pub fn parse_slurp_geometry(geom: &str) -> Result<(i32, i32, u32, u32)> {
-    let (pos, size) = geom
+fn parse_slurp_geometry(geom: &str) -> Result<(i32, i32, u32, u32)> {
+    let (pos_part, size_part) = geom
+        .trim()
         .split_once(' ')
         .ok_or_else(|| AppError::Other("Invalid geometry string: missing space".to_string()))?;
 
-    let (x_str, y_str) = pos.split_once(',').ok_or_else(|| {
+    let (x_str, y_str) = pos_part.trim().split_once(',').ok_or_else(|| {
         AppError::Other("Invalid geometry string: missing comma in position".to_string())
     })?;
 
-    let (w_str, h_str) = size.split_once('x').ok_or_else(|| {
+    let (w_str, h_str) = size_part.trim().split_once('x').ok_or_else(|| {
         AppError::Other("Invalid geometry string: missing 'x' in size".to_string())
     })?;
 
     let x = x_str
+        .trim()
         .parse::<i32>()
         .map_err(|_| AppError::Other(format!("Invalid x in geometry: '{}'", x_str)))?;
     let y = y_str
+        .trim()
         .parse::<i32>()
         .map_err(|_| AppError::Other(format!("Invalid y in geometry: '{}'", y_str)))?;
     let w = w_str
+        .trim()
         .parse::<u32>()
         .map_err(|_| AppError::Other(format!("Invalid w in geometry: '{}'", w_str)))?;
     let h = h_str
+        .trim()
         .parse::<u32>()
         .map_err(|_| AppError::Other(format!("Invalid h in geometry: '{}'", h_str)))?;
 
@@ -231,6 +236,13 @@ mod tests {
         assert_eq!(y, 0);
         assert_eq!(w, 1920);
         assert_eq!(h, 1080);
+
+        // Extra whitespace (surrounding)
+        let (x, y, w, h) = parse_slurp_geometry("  10,20 100x200  ").unwrap();
+        assert_eq!(x, 10);
+        assert_eq!(y, 20);
+        assert_eq!(w, 100);
+        assert_eq!(h, 200);
 
         // Invalid string (completely unparseable)
         assert!(parse_slurp_geometry("invalid").is_err());
