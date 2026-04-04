@@ -5,10 +5,12 @@ A fast, Hyprland-native screenshot tool written in Rust.
 ## Features
 
 - **Immediate capture** — crop region, active window, focused monitor, or all monitors
+- **Portal capture** — capture the active window via xdg-desktop-portal (for transparent windows)
 - **Freeze mode** — freeze the screen and interactively select what to capture via an overlay UI (similar to Windows Win+Shift+S)
 - Automatic clipboard copy via `wl-copy`
 - Desktop notification on success/failure
-- Configurable save path and filename pattern
+- Configurable save path, filename pattern, and freeze toolbar glyphs
+- `generate-config` command to scaffold a default config file
 
 ## Requirements
 
@@ -38,29 +40,40 @@ cp target/release/crop-hypr ~/.local/bin/
 ## Usage
 
 ```sh
-crop-hypr <SUBCOMMAND>
+crop-hypr [--config <FILE>] <SUBCOMMAND>
 ```
 
 | Subcommand | Description |
 | ---------- | ----------- |
 | `crop` | Select a region with slurp and capture it |
-| `window` | Capture the active window |
+| `window` | Capture the active window (geometry via Hyprland IPC) |
+| `portal` | Capture the active window via xdg-desktop-portal |
 | `monitor` | Capture the focused monitor |
 | `all` | Capture all monitors |
 | `freeze` | Freeze screen and select interactively |
+| `generate-config` | Write a default config file |
+
+### Global flag
+
+`--config <FILE>` / `-c <FILE>` — Load config from a custom path instead of the default.
+Works with every subcommand, including `generate-config`.
+
+```sh
+crop-hypr --config ~/.config/crop-hypr/work.toml freeze
+```
 
 ### Freeze mode
 
 Freeze mode overlays the screen and lets you switch capture type via a toolbar:
 
-![](./bar.png)
+![bar-image](./bar.png)
 
 | Icon | Mode | Behaviour |
 | ---- | ---- | --------- |
 | 󰆟 | Crop | Drag to draw a custom rectangle |
-|  | Window | Hover and click a window |
+|  | Window | Hover and click a window |
 | 󰍹 | Monitor | Hover and click a monitor |
-| 󰁌 | All | Capture everything instantly |
+| �� | All | Capture everything instantly |
 | 󰖭 | Close | Cancel (same as Escape) |
 
 **Keyboard:** `Escape` cancels and exits.
@@ -78,7 +91,15 @@ bind = CTRL, Print,   exec, crop-hypr window
 
 Config file location: `~/.config/crop-hypr/config.toml`
 
-The file is created with defaults on first run if absent.
+Generate a default config with:
+
+```sh
+crop-hypr generate-config
+# Already exists? Use --force to overwrite:
+crop-hypr generate-config --force
+# Write to a custom path:
+crop-hypr --config ~/my-config.toml generate-config
+```
 
 ### Sample config
 
@@ -91,10 +112,14 @@ save_path = "~/Pictures/Screenshots"
 # Default: "hyprsnap_%Y%m%d_%H%M%S"
 filename_pattern = "screenshot_%Y-%m-%d_%H-%M-%S"
 
-# How individual windows are captured.
-# "geometry" — use Hyprland IPC to get window coordinates, then capture via Wayland screencopy (default)
-# "portal"   — xdg-desktop-portal based capture (TODO: not yet implemented)
-window_capture_method = "geometry"
+# Glyphs shown in the freeze mode toolbar.
+# Requires a Nerd Font. Override individual icons as needed.
+[freeze_glyphs]
+crop    = "󰆟"
+window  = ""
+monitor = "󰍹"
+all     = "󰁌"
+cancel  = "󰖭"
 ```
 
 ### Config reference
@@ -103,7 +128,11 @@ window_capture_method = "geometry"
 | --- | ---- | ------- | ----------- |
 | `save_path` | path | `~/Pictures/Screenshots` | Destination directory for saved screenshots |
 | `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | strftime pattern for filenames (no extension) |
-| `window_capture_method` | `"geometry"` \| `"portal"` | `"geometry"` | Window capture backend |
+| `freeze_glyphs.crop` | string | `󰆟` | Toolbar icon for crop mode |
+| `freeze_glyphs.window` | string | `` | Toolbar icon for window mode |
+| `freeze_glyphs.monitor` | string | `󰍹` | Toolbar icon for monitor mode |
+| `freeze_glyphs.all` | string | `󰁌` | Toolbar icon for all-monitors mode |
+| `freeze_glyphs.cancel` | string | `󰖭` | Toolbar icon for cancel button |
 
 ## License
 

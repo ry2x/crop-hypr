@@ -22,7 +22,7 @@ enum Commands {
     Crop,
     /// Capture the active window (geometry via hyprctl)
     Window,
-    /// Capture the active window via xdg-desktop-portal (for transparent windows)
+    /// Capture the window via xdg-desktop-portal (not yet implemented)
     Portal,
     /// Capture the focused monitor
     Monitor,
