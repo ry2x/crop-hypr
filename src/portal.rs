@@ -58,10 +58,10 @@ pub fn capture(cfg: &Config) -> Result<PathBuf> {
 
 async fn open_portal() -> Result<(u32, OwnedFd)> {
     use ashpd::desktop::{
+        PersistMode,
         screencast::{
             CursorMode, OpenPipeWireRemoteOptions, Screencast, SelectSourcesOptions, SourceType,
         },
-        PersistMode,
     };
 
     let proxy: Screencast = Screencast::new()
@@ -110,10 +110,10 @@ async fn open_portal() -> Result<(u32, OwnedFd)> {
 fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
     pw::init();
 
-    let mainloop = pw::main_loop::MainLoopRc::new(None)
-        .map_err(|e| AppError::Other(e.to_string()))?;
-    let context = pw::context::ContextRc::new(&mainloop, None)
-        .map_err(|e| AppError::Other(e.to_string()))?;
+    let mainloop =
+        pw::main_loop::MainLoopRc::new(None).map_err(|e| AppError::Other(e.to_string()))?;
+    let context =
+        pw::context::ContextRc::new(&mainloop, None).map_err(|e| AppError::Other(e.to_string()))?;
     let core = context
         .connect_fd_rc(fd, None)
         .map_err(|e| AppError::Other(e.to_string()))?;
@@ -186,7 +186,11 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
             let dt = datas[0].type_();
             let (chunk_offset, chunk_size, stride) = {
                 let chunk = datas[0].chunk();
-                (chunk.offset() as usize, chunk.size() as usize, chunk.stride())
+                (
+                    chunk.offset() as usize,
+                    chunk.size() as usize,
+                    chunk.stride(),
+                )
             };
             if chunk_size == 0 {
                 return;
@@ -231,11 +235,7 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
                                 .ok()?
                             };
                             let _ = unsafe {
-                                nix::sys::mman::madvise(
-                                    ptr,
-                                    len.get(),
-                                    MmapAdvise::MADV_SEQUENTIAL,
-                                )
+                                nix::sys::mman::madvise(ptr, len.get(), MmapAdvise::MADV_SEQUENTIAL)
                             };
                             let slice = unsafe {
                                 std::slice::from_raw_parts(ptr.as_ptr().cast::<u8>(), len.get())
@@ -391,9 +391,7 @@ fn decode_frame(data: &[u8], w: u32, h: u32, stride: u32, fmt: VideoFormat) -> O
                 // BGRA → RGBA
                 VideoFormat::BGRA => Rgba([src[base + 2], src[base + 1], src[base], src[base + 3]]),
                 // BGRx → RGBA (x → 255)
-                VideoFormat::BGRx => {
-                    Rgba([src[base + 2], src[base + 1], src[base], 255])
-                }
+                VideoFormat::BGRx => Rgba([src[base + 2], src[base + 1], src[base], 255]),
                 // RGBA → RGBA (pass-through)
                 VideoFormat::RGBA => Rgba([src[base], src[base + 1], src[base + 2], src[base + 3]]),
                 // RGBx → RGBA
@@ -445,7 +443,7 @@ mod tests {
         // stride=8 means 4 pixels-per-row + 4 bytes padding; only 1 pixel wide
         let data = [
             1u8, 2, 3, 4, 9, 9, 9, 9, // row 0: pixel + padding
-            5, 6, 7, 8, 8, 8, 8, 8,   // row 1: pixel + padding
+            5, 6, 7, 8, 8, 8, 8, 8, // row 1: pixel + padding
         ];
         let img = decode_frame(&data, 1, 2, 8, VideoFormat::RGBA).expect("stride decode");
         assert_eq!(*img.get_pixel(0, 0), Rgba([1, 2, 3, 4]));
