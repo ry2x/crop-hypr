@@ -1,11 +1,21 @@
-use std::{cell::RefCell, os::fd::OwnedFd, path::PathBuf, rc::Rc};
+use std::{
+    cell::RefCell,
+    num::NonZeroUsize,
+    os::fd::{BorrowedFd, OwnedFd},
+    path::PathBuf,
+    rc::Rc,
+};
 
 use image::{ImageBuffer, Rgba, RgbaImage};
+use nix::sys::mman::{MapFlags, MmapAdvise, ProtFlags};
 use pipewire as pw;
 use pw::{
     main_loop::MainLoopWeak,
     properties::properties,
-    spa::param::video::{VideoFormat, VideoInfoRaw},
+    spa::{
+        buffer::DataType,
+        param::video::{VideoFormat, VideoInfoRaw},
+    },
     stream::StreamFlags,
 };
 
@@ -23,14 +33,19 @@ struct UserData {
 }
 
 pub fn capture(cfg: &Config) -> Result<PathBuf> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
+    let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| AppError::Other(e.to_string()))?;
 
-    let (node_id, fd) = runtime.block_on(open_portal())?;
+    let (node_id, fd) = rt.block_on(open_portal())?;
 
-    let image = pipewire_capture(node_id, fd)?;
+    // Use a true OS thread so PipeWire's main loop is fully isolated from the
+    // tokio reactor — they both use signal handlers and thread-local state that
+    // must not be shared.
+    let image = std::thread::spawn(move || pipewire_capture(node_id, fd))
+        .join()
+        .map_err(|_| AppError::Other("PipeWire capture thread panicked".into()))??;
 
     let path = cfg.output_path();
     image.save(&path).map_err(AppError::from)?;
@@ -147,21 +162,75 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
             if datas.is_empty() {
                 return;
             }
-            let (size, stride) = {
-                let chunk = datas[0].chunk();
-                (chunk.size() as usize, chunk.stride())
-            };
-            if size == 0 {
+
+            // Safety: access the raw spa_data to check chunk pointer before
+            // dereferencing it. A null chunk causes a panic inside chunk()
+            // which, crossing the C FFI boundary, becomes SIGSEGV.
+            let raw = datas[0].as_raw();
+            if raw.chunk.is_null() {
                 return;
             }
-            let data_slice = match datas[0].data() {
-                Some(d) => d,
-                None => return,
+            let dt = datas[0].type_();
+            let (chunk_offset, chunk_size, stride) = {
+                let chunk = datas[0].chunk();
+                (chunk.offset() as usize, chunk.size() as usize, chunk.stride())
             };
-            let frame = &data_slice[..size.min(data_slice.len())];
-            let w = ud.format.size().width;
-            let h = ud.format.size().height;
-            if let Some(img) = decode_frame(frame, w, h, stride as u32, ud.format.format()) {
+            if chunk_size == 0 {
+                return;
+            }
+
+            let maybe_img = match dt {
+                DataType::MemPtr => {
+                    // Data pointer already mapped by PipeWire.
+                    datas[0].data().and_then(|d: &mut [u8]| {
+                        let end = (chunk_offset + chunk_size).min(d.len());
+                        let frame = &d[chunk_offset.min(d.len())..end];
+                        let w = ud.format.size().width;
+                        let h = ud.format.size().height;
+                        decode_frame(frame, w, h, stride as u32, ud.format.format())
+                    })
+                }
+                DataType::MemFd => {
+                    // Manually mmap the memfd. Must use spa_data.mapoffset
+                    // (page-aligned offset into the fd) and spa_data.maxsize
+                    // (total map size). Using chunk values here underestimates
+                    // the map size and causes SIGSEGV on access.
+                    let map_size = raw.maxsize as usize;
+                    let map_offset = raw.mapoffset as i64;
+                    let raw_fd = raw.fd as i32;
+
+                    NonZeroUsize::new(map_size.max(1)).and_then(|len| {
+                        let bfd = unsafe { BorrowedFd::borrow_raw(raw_fd) };
+                        let ptr = unsafe {
+                            nix::sys::mman::mmap(
+                                None,
+                                len,
+                                ProtFlags::PROT_READ,
+                                MapFlags::MAP_SHARED,
+                                bfd,
+                                map_offset,
+                            )
+                            .ok()?
+                        };
+                        let _ = unsafe {
+                            nix::sys::mman::madvise(ptr, len.get(), MmapAdvise::MADV_SEQUENTIAL)
+                        };
+                        let slice = unsafe {
+                            std::slice::from_raw_parts(ptr.as_ptr().cast::<u8>(), len.get())
+                        };
+                        let end = (chunk_offset + chunk_size).min(len.get());
+                        let frame = &slice[chunk_offset.min(len.get())..end];
+                        let w = ud.format.size().width;
+                        let h = ud.format.size().height;
+                        let img = decode_frame(frame, w, h, stride as u32, ud.format.format());
+                        let _ = unsafe { nix::sys::mman::munmap(ptr, len.get()) };
+                        img
+                    })
+                }
+                _ => None,
+            };
+
+            if let Some(img) = maybe_img {
                 *ud.image.borrow_mut() = Some(img);
             }
             if let Some(ml) = ud.ml_weak.upgrade() {
@@ -242,7 +311,7 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
         .connect(
             pw::spa::utils::Direction::Input,
             Some(node_id),
-            StreamFlags::AUTOCONNECT | StreamFlags::MAP_BUFFERS,
+            StreamFlags::AUTOCONNECT,
             &mut params,
         )
         .map_err(|e| AppError::Other(e.to_string()))?;
