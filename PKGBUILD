@@ -2,13 +2,13 @@
 
 pkgname=crop-hypr
 pkgver=0.4.0
-pkgrel=1
+pkgrel=2
 pkgdesc="A fast, Hyprland-native screenshot tool written in Rust"
 arch=('x86_64')
 url="https://github.com/ry2x/crop-hypr"
 license=('MIT')
-depends=('slurp' 'wl-clipboard' 'hyprland' 'libnotify')
-makedepends=('rust' 'cargo')
+depends=('slurp' 'wl-clipboard' 'hyprland' 'libnotify' 'pipewire')
+makedepends=('rust' 'cargo' 'clang' 'pkgconf')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
