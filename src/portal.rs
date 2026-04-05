@@ -28,6 +28,7 @@ struct UserData {
     format: VideoInfoRaw,
     image: Rc<RefCell<Option<RgbaImage>>>,
     ml_weak: MainLoopWeak,
+    error: Rc<RefCell<Option<String>>>,
 }
 
 pub fn capture(cfg: &Config) -> Result<PathBuf> {
@@ -115,10 +116,13 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
     let image_cell: Rc<RefCell<Option<RgbaImage>>> = Rc::new(RefCell::new(None));
     let ml_weak = mainloop.downgrade();
 
+    let error_cell: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+
     let user_data = UserData {
         format: Default::default(),
         image: image_cell.clone(),
         ml_weak,
+        error: error_cell.clone(),
     };
 
     let stream = pw::stream::StreamRc::new(
@@ -148,6 +152,14 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
                 return;
             }
             let _ = ud.format.parse(param);
+        })
+        .state_changed(|_stream, ud, _old, new| {
+            if let pw::stream::StreamState::Error(msg) = new {
+                *ud.error.borrow_mut() = Some(msg);
+                if let Some(ml) = ud.ml_weak.upgrade() {
+                    ml.quit();
+                }
+            }
         })
         .process(|stream, ud| {
             let Some(mut buf) = stream.dequeue_buffer() else {
@@ -227,9 +239,9 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
 
             if let Some(img) = maybe_img {
                 *ud.image.borrow_mut() = Some(img);
-            }
-            if let Some(ml) = ud.ml_weak.upgrade() {
-                ml.quit();
+                if let Some(ml) = ud.ml_weak.upgrade() {
+                    ml.quit();
+                }
             }
         })
         .register()
@@ -315,6 +327,10 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
 
     drop(_listener);
 
+    if let Some(err) = error_cell.borrow_mut().take() {
+        return Err(AppError::Other(format!("PipeWire stream error: {err}")));
+    }
+
     image_cell
         .borrow_mut()
         .take()
@@ -353,4 +369,74 @@ fn decode_frame(data: &[u8], w: u32, h: u32, stride: u32, fmt: VideoFormat) -> O
         }
     }
     Some(img)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_frame;
+    use image::Rgba;
+    use pipewire::spa::param::video::VideoFormat;
+
+    #[test]
+    fn decode_frame_converts_bgra() {
+        let data = [10u8, 20, 30, 40];
+        let img = decode_frame(&data, 1, 1, 4, VideoFormat::BGRA).expect("BGRA decode");
+        assert_eq!(*img.get_pixel(0, 0), Rgba([30, 20, 10, 40]));
+    }
+
+    #[test]
+    fn decode_frame_converts_bgrx() {
+        let data = [10u8, 20, 30, 99];
+        let img = decode_frame(&data, 1, 1, 4, VideoFormat::BGRx).expect("BGRx decode");
+        assert_eq!(*img.get_pixel(0, 0), Rgba([30, 20, 10, 255]));
+    }
+
+    #[test]
+    fn decode_frame_converts_rgba() {
+        let data = [1u8, 2, 3, 4];
+        let img = decode_frame(&data, 1, 1, 4, VideoFormat::RGBA).expect("RGBA decode");
+        assert_eq!(*img.get_pixel(0, 0), Rgba([1, 2, 3, 4]));
+    }
+
+    #[test]
+    fn decode_frame_converts_rgbx() {
+        let data = [5u8, 6, 7, 200];
+        let img = decode_frame(&data, 1, 1, 4, VideoFormat::RGBx).expect("RGBx decode");
+        assert_eq!(*img.get_pixel(0, 0), Rgba([5, 6, 7, 255]));
+    }
+
+    #[test]
+    fn decode_frame_respects_stride_padding() {
+        // stride=8 means 4 pixels-per-row + 4 bytes padding; only 1 pixel wide
+        let data = [
+            1u8, 2, 3, 4, 9, 9, 9, 9, // row 0: pixel + padding
+            5, 6, 7, 8, 8, 8, 8, 8,   // row 1: pixel + padding
+        ];
+        let img = decode_frame(&data, 1, 2, 8, VideoFormat::RGBA).expect("stride decode");
+        assert_eq!(*img.get_pixel(0, 0), Rgba([1, 2, 3, 4]));
+        assert_eq!(*img.get_pixel(0, 1), Rgba([5, 6, 7, 8]));
+    }
+
+    #[test]
+    fn decode_frame_rejects_zero_dimensions() {
+        assert!(decode_frame(&[1, 2, 3, 4], 0, 1, 4, VideoFormat::RGBA).is_none());
+        assert!(decode_frame(&[1, 2, 3, 4], 1, 0, 4, VideoFormat::RGBA).is_none());
+    }
+
+    #[test]
+    fn decode_frame_rejects_unsupported_format() {
+        assert!(decode_frame(&[1, 2, 3, 4], 1, 1, 4, VideoFormat::Unknown).is_none());
+    }
+
+    #[test]
+    fn decode_frame_rejects_insufficient_row_data() {
+        assert!(decode_frame(&[1, 2, 3], 1, 1, 4, VideoFormat::RGBA).is_none());
+    }
+
+    #[test]
+    fn decode_frame_rejects_short_second_row() {
+        // stride=8, w=1, h=2 → row 1 needs bytes 8..12; 11 bytes is insufficient
+        let data = [1u8, 2, 3, 4, 9, 9, 9, 9, 5, 6, 7];
+        assert!(decode_frame(&data, 1, 2, 8, VideoFormat::RGBA).is_none());
+    }
 }
