@@ -6,4 +6,5 @@ pub mod error;
 pub mod freeze;
 pub mod hyprland;
 pub mod notify;
+pub mod portal;
 pub mod screencopy;

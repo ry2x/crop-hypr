@@ -48,7 +48,7 @@ crop-hypr [--config <FILE>] <SUBCOMMAND>
 | ---------- | ----------- |
 | `crop` | Select a region with slurp and capture it |
 | `window` | Capture the active window (geometry via Hyprland IPC) |
-| `portal` | Capture the active window via xdg-desktop-portal *(not yet implemented)* |
+| `portal` | Capture the active window via xdg-desktop-portal (shows WM source-picker) |
 | `monitor` | Capture the focused monitor |
 | `all` | Capture all monitors |
 | `freeze` | Freeze screen and select interactively |
