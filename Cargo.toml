@@ -39,7 +39,7 @@ wayland-protocols = { version = "0.32", features = [
 nix = { version = "0.29", features = ["mman", "fs", "poll"] }
 memmap2 = "0.9"
 ashpd = { version = "0.13", default-features = false, features = ["tokio", "screencast"] }
-tokio = { version = "1", features = ["rt"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 pipewire = "0.9"
 
 [profile.release]

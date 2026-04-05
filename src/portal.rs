@@ -20,10 +20,8 @@ use pw::{
 };
 
 use crate::{
-    clipboard,
     config::Config,
     error::{AppError, Result},
-    notify,
 };
 
 struct UserData {
@@ -49,9 +47,6 @@ pub fn capture(cfg: &Config) -> Result<PathBuf> {
 
     let path = cfg.output_path();
     image.save(&path).map_err(AppError::from)?;
-    clipboard::copy_to_clipboard(&path)?;
-    notify::notify_success(&path);
-    println!("{}", path.display());
     Ok(path)
 }
 
