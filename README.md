@@ -71,7 +71,7 @@ Freeze mode overlays the screen and lets you switch capture type via a toolbar:
 | Icon | Mode | Behaviour |
 | ---- | ---- | --------- |
 | 󰆟 | Crop | Drag to draw a custom rectangle |
-|  | Window | Hover and click a window |
+| | Window | Hover and click a window |
 | 󰍹 | Monitor | Hover and click a monitor |
 | �� | All | Capture everything instantly |
 | 󰖭 | Close | Cancel (same as Escape) |
