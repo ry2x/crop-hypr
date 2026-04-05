@@ -5,8 +5,8 @@ A fast, Hyprland-native screenshot tool written in Rust.
 ## Features
 
 - **Immediate capture** — crop region, active window, focused monitor, or all monitors
-- **Portal capture** — capture the active window via xdg-desktop-portal (for transparent windows)
-- **Freeze mode** — freeze the screen and interactively select what to capture via an overlay UI (similar to Windows Win+Shift+S)
+- **Portal capture** — capture the active window via xdg-desktop-portal, for transparent windows *(Not yet implemented)*
+- **Freeze mode** — freeze the screen and interactively select what to capture via an overlay UI (similar to Windows Win+Shift+S Clipping Tool)
 - Automatic clipboard copy via `wl-copy`
 - Desktop notification on success/failure
 - Configurable save path, filename pattern, and freeze toolbar glyphs
@@ -28,7 +28,8 @@ Screen capture is performed natively via the **`zwlr_screencopy_manager_v1`** Wa
 Window and monitor metadata is fetched directly via the **Hyprland IPC socket**
 (`$XDG_RUNTIME_DIR/hypr/<sig>/.socket.sock`).
 
-A [Nerd Font](https://www.nerdfonts.com/) is recommended for the freeze mode toolbar icons.
+> [!CAUTION]
+> A [Nerd Font](https://www.nerdfonts.com/) is required to display default glyphs in the freeze mode toolbar. Check the [configuration section](#configuration) for details on customizing icons.
 
 ## Installation
 
@@ -47,7 +48,7 @@ crop-hypr [--config <FILE>] <SUBCOMMAND>
 | ---------- | ----------- |
 | `crop` | Select a region with slurp and capture it |
 | `window` | Capture the active window (geometry via Hyprland IPC) |
-| `portal` | Capture the active window via xdg-desktop-portal |
+| `portal` | Capture the active window via xdg-desktop-portal *(not yet implemented)* |
 | `monitor` | Capture the focused monitor |
 | `all` | Capture all monitors |
 | `freeze` | Freeze screen and select interactively |
@@ -68,13 +69,15 @@ Freeze mode overlays the screen and lets you switch capture type via a toolbar:
 
 ![bar-image](./bar.png)
 
-| Icon | Mode | Behaviour |
-| ---- | ---- | --------- |
-| 󰆟 | Crop | Drag to draw a custom rectangle |
-| | Window | Hover and click a window |
-| 󰍹 | Monitor | Hover and click a monitor |
-| �� | All | Capture everything instantly |
-| 󰖭 | Close | Cancel (same as Escape) |
+| Mode | Behaviour |
+| ---- | --------- |
+| Crop | Drag to draw a custom rectangle |
+| Window | Hover and click a window |
+| Monitor | Hover and click a monitor |
+| All | Capture everything instantly |
+| Close | Cancel (same as Escape) |
+
+Icon glyphs can be customized in the config file. Check the [configuration section](#configuration) for details.
 
 **Keyboard:** `Escape` cancels and exits.
 
@@ -105,7 +108,7 @@ crop-hypr --config ~/my-config.toml generate-config
 
 ```toml
 # Directory where screenshots are saved.
-# Default: ~/Pictures/Screenshots
+# Default: ~/Screenshots
 save_path = "~/Pictures/Screenshots"
 
 # strftime-style filename template (no extension — .png is appended automatically).
@@ -128,11 +131,11 @@ cancel  = "󰖭"
 | --- | ---- | ------- | ----------- |
 | `save_path` | path | `~/Pictures/Screenshots` | Destination directory for saved screenshots |
 | `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | strftime pattern for filenames (no extension) |
-| `freeze_glyphs.crop` | string | `󰆟` | Toolbar icon for crop mode |
-| `freeze_glyphs.window` | string | `` | Toolbar icon for window mode |
-| `freeze_glyphs.monitor` | string | `󰍹` | Toolbar icon for monitor mode |
-| `freeze_glyphs.all` | string | `󰁌` | Toolbar icon for all-monitors mode |
-| `freeze_glyphs.cancel` | string | `󰖭` | Toolbar icon for cancel button |
+| `freeze_glyphs.crop` | string | `󰆟` (U+F019F) | Toolbar icon for crop mode |
+| `freeze_glyphs.window` | string | `` (U+EB7F) | Toolbar icon for window mode |
+| `freeze_glyphs.monitor` | string | `󰍹` (U+F0379) | Toolbar icon for monitor mode |
+| `freeze_glyphs.all` | string | `󰁌` (U+F004C) | Toolbar icon for all-monitors mode |
+| `freeze_glyphs.cancel` | string | `󰖭` (U+F05AD) | Toolbar icon for cancel button |
 
 ## License
 
