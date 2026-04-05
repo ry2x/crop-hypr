@@ -5,7 +5,7 @@ A fast, Hyprland-native screenshot tool written in Rust.
 ## Features
 
 - **Immediate capture** — crop region, active window, focused monitor, or all monitors
-- **Portal capture** — capture the active window via xdg-desktop-portal, for transparent windows *(Not yet implemented)*
+- **Portal capture** — select any window or monitor via xdg-desktop-portal's WM source-picker
 - **Freeze mode** — freeze the screen and interactively select what to capture via an overlay UI (similar to Windows Win+Shift+S Clipping Tool)
 - Automatic clipboard copy via `wl-copy`
 - Desktop notification on success/failure
@@ -48,7 +48,7 @@ crop-hypr [--config <FILE>] <SUBCOMMAND>
 | ---------- | ----------- |
 | `crop` | Select a region with slurp and capture it |
 | `window` | Capture the active window (geometry via Hyprland IPC) |
-| `portal` | Capture the active window via xdg-desktop-portal *(not yet implemented)* |
+| `portal` | Capture a selected window or monitor via xdg-desktop-portal (shows WM source-picker) |
 | `monitor` | Capture the focused monitor |
 | `all` | Capture all monitors |
 | `freeze` | Freeze screen and select interactively |
