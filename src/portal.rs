@@ -24,11 +24,16 @@ use crate::{
     error::{AppError, Result},
 };
 
+/// Quit the PipeWire main loop after this many consecutive undecoded frames
+/// to prevent an indefinite hang when the stream delivers unusable buffers.
+const MAX_FAILED_FRAMES: u32 = 10;
+
 struct UserData {
     format: VideoInfoRaw,
     image: Rc<RefCell<Option<RgbaImage>>>,
     ml_weak: MainLoopWeak,
     error: Rc<RefCell<Option<String>>>,
+    failed_frames: u32,
 }
 
 pub fn capture(cfg: &Config) -> Result<PathBuf> {
@@ -123,6 +128,7 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
         image: image_cell.clone(),
         ml_weak,
         error: error_cell.clone(),
+        failed_frames: 0,
     };
 
     let stream = pw::stream::StreamRc::new(
@@ -206,33 +212,43 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
                     let map_offset = raw.mapoffset as i64;
                     let raw_fd = raw.fd as i32;
 
-                    NonZeroUsize::new(map_size.max(1)).and_then(|len| {
-                        let bfd = unsafe { BorrowedFd::borrow_raw(raw_fd) };
-                        let ptr = unsafe {
-                            nix::sys::mman::mmap(
-                                None,
-                                len,
-                                ProtFlags::PROT_READ,
-                                MapFlags::MAP_SHARED,
-                                bfd,
-                                map_offset,
-                            )
-                            .ok()?
-                        };
-                        let _ = unsafe {
-                            nix::sys::mman::madvise(ptr, len.get(), MmapAdvise::MADV_SEQUENTIAL)
-                        };
-                        let slice = unsafe {
-                            std::slice::from_raw_parts(ptr.as_ptr().cast::<u8>(), len.get())
-                        };
-                        let end = (chunk_offset + chunk_size).min(len.get());
-                        let frame = &slice[chunk_offset.min(len.get())..end];
-                        let w = ud.format.size().width;
-                        let h = ud.format.size().height;
-                        let img = decode_frame(frame, w, h, stride as u32, ud.format.format());
-                        let _ = unsafe { nix::sys::mman::munmap(ptr, len.get()) };
-                        img
-                    })
+                    // spa_data.fd == -1 means no fd is set; constructing a
+                    // BorrowedFd from -1 is immediate UB at the Rust level.
+                    if raw_fd < 0 {
+                        None
+                    } else {
+                        NonZeroUsize::new(map_size.max(1)).and_then(|len| {
+                            let bfd = unsafe { BorrowedFd::borrow_raw(raw_fd) };
+                            let ptr = unsafe {
+                                nix::sys::mman::mmap(
+                                    None,
+                                    len,
+                                    ProtFlags::PROT_READ,
+                                    MapFlags::MAP_SHARED,
+                                    bfd,
+                                    map_offset,
+                                )
+                                .ok()?
+                            };
+                            let _ = unsafe {
+                                nix::sys::mman::madvise(
+                                    ptr,
+                                    len.get(),
+                                    MmapAdvise::MADV_SEQUENTIAL,
+                                )
+                            };
+                            let slice = unsafe {
+                                std::slice::from_raw_parts(ptr.as_ptr().cast::<u8>(), len.get())
+                            };
+                            let end = (chunk_offset + chunk_size).min(len.get());
+                            let frame = &slice[chunk_offset.min(len.get())..end];
+                            let w = ud.format.size().width;
+                            let h = ud.format.size().height;
+                            let img = decode_frame(frame, w, h, stride as u32, ud.format.format());
+                            let _ = unsafe { nix::sys::mman::munmap(ptr, len.get()) };
+                            img
+                        })
+                    }
                 }
                 _ => None,
             };
@@ -241,6 +257,18 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
                 *ud.image.borrow_mut() = Some(img);
                 if let Some(ml) = ud.ml_weak.upgrade() {
                     ml.quit();
+                }
+            } else {
+                // Guard against an indefinite hang when the stream delivers
+                // buffers that cannot be decoded (unsupported format, mmap
+                // failure, zero stride, etc.).
+                ud.failed_frames += 1;
+                if ud.failed_frames >= MAX_FAILED_FRAMES {
+                    *ud.error.borrow_mut() =
+                        Some("stream delivered too many undecodable frames".into());
+                    if let Some(ml) = ud.ml_weak.upgrade() {
+                        ml.quit();
+                    }
                 }
             }
         })
@@ -341,7 +369,14 @@ fn decode_frame(data: &[u8], w: u32, h: u32, stride: u32, fmt: VideoFormat) -> O
     if w == 0 || h == 0 {
         return None;
     }
-    let stride = stride as usize;
+    let min_stride = w as usize * 4;
+    // stride == 0 means tightly packed; treat as w*4.
+    // stride < min_stride means rows overlap — reject to avoid corrupted output.
+    let stride = match stride as usize {
+        0 => min_stride,
+        s if s < min_stride => return None,
+        s => s,
+    };
     let mut img: RgbaImage = ImageBuffer::new(w, h);
     for row in 0..h as usize {
         let row_start = row * stride;
@@ -438,5 +473,19 @@ mod tests {
         // stride=8, w=1, h=2 → row 1 needs bytes 8..12; 11 bytes is insufficient
         let data = [1u8, 2, 3, 4, 9, 9, 9, 9, 5, 6, 7];
         assert!(decode_frame(&data, 1, 2, 8, VideoFormat::RGBA).is_none());
+    }
+
+    #[test]
+    fn decode_frame_zero_stride_treated_as_packed() {
+        // stride=0 should be treated as w*4 (tightly packed)
+        let data = [10u8, 20, 30, 40];
+        let img = decode_frame(&data, 1, 1, 0, VideoFormat::RGBA).expect("zero stride decode");
+        assert_eq!(*img.get_pixel(0, 0), Rgba([10, 20, 30, 40]));
+    }
+
+    #[test]
+    fn decode_frame_rejects_stride_smaller_than_row() {
+        // stride=3 is smaller than w*4=4 — rows would overlap
+        assert!(decode_frame(&[1, 2, 3, 4], 1, 1, 3, VideoFormat::RGBA).is_none());
     }
 }
