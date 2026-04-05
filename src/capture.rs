@@ -208,6 +208,16 @@ pub fn capture_monitor(cfg: &Config) -> Result<PathBuf> {
     Ok(path)
 }
 
+pub fn capture_portal(_cfg: &Config) -> Result<PathBuf> {
+    // TODO: Implement via xdg-desktop-portal (org.freedesktop.portal.Screenshot).
+    // The `ashpd` crate provides an async Rust binding; add it as a dependency
+    // and drive the portal request with a tokio runtime here.
+    Err(AppError::Other(
+        "portal capture is not yet implemented; use `window` for geometry-based capture"
+            .to_string(),
+    ))
+}
+
 pub fn capture_all(cfg: &Config) -> Result<PathBuf> {
     let monitors = hyprland::parse_monitors(hyprland::get_monitors()?);
     let img = screencopy::capture_all_monitors(&monitors)?;

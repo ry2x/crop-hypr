@@ -15,6 +15,7 @@ use iced::{
     },
 };
 
+use crate::config::FreezeGlyphs;
 use crate::hyprland::{MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
@@ -260,6 +261,7 @@ pub struct AppState {
     /// repeated renders so that wgpu surfaces that fail their first
     /// `compositor.present()` (SurfaceError::Outdated) get a second chance.
     repaint_ticks: u8,
+    glyphs: FreezeGlyphs,
 }
 
 impl AppState {
@@ -270,6 +272,7 @@ impl AppState {
         windows: Arc<Vec<WindowInfo>>,
         monitors: Arc<Vec<MonitorInfo>>,
         result: Arc<Mutex<Option<Option<ScreenRect>>>>,
+        glyphs: FreezeGlyphs,
     ) -> Self {
         Self {
             mode: CaptureMode::Crop,
@@ -282,6 +285,7 @@ impl AppState {
             // Give every window up to ~300 ms of forced redraws so that wgpu
             // surfaces that initially fail `present()` recover without a click.
             repaint_ticks: 6,
+            glyphs,
         }
     }
 
@@ -356,8 +360,8 @@ impl AppState {
     }
 
     fn toolbar(&self) -> Element<'_, Message> {
-        let btn = |label: &'static str, mode: CaptureMode, active: bool| {
-            button(Text::new(label).size(22))
+        let btn = |label: &str, mode: CaptureMode, active: bool| {
+            button(Text::new(label.to_owned()).size(22))
                 .on_press(Message::ModeSelected(mode))
                 .style(if active {
                     button::primary
@@ -371,23 +375,23 @@ impl AppState {
             Row::new()
                 .spacing(8)
                 .push(btn(
-                    "\u{F019F}",
+                    &self.glyphs.crop,
                     CaptureMode::Crop,
                     self.mode == CaptureMode::Crop,
                 ))
                 .push(btn(
-                    "\u{EB7F}",
+                    &self.glyphs.window,
                     CaptureMode::Window,
                     self.mode == CaptureMode::Window,
                 ))
                 .push(btn(
-                    "\u{F0379}",
+                    &self.glyphs.monitor,
                     CaptureMode::Monitor,
                     self.mode == CaptureMode::Monitor,
                 ))
-                .push(btn("\u{F004C}", CaptureMode::All, false))
+                .push(btn(&self.glyphs.all, CaptureMode::All, false))
                 .push(
-                    button(Text::new("\u{F05AD}").size(22))
+                    button(Text::new(self.glyphs.cancel.as_str()).size(22))
                         .on_press(Message::Cancel)
                         .style(button::danger)
                         .padding([10, 18]),
