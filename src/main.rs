@@ -73,7 +73,7 @@ fn generate_config(custom_path: Option<&std::path::Path>, force: bool) -> Result
         .unwrap_or_else(Config::default_config_path);
 
     if path.exists() && !force {
-        return Err(AppError::Other(format!(
+        return Err(AppError::Config(format!(
             "config file already exists: {}\nUse --force to overwrite",
             path.display()
         )));
@@ -84,7 +84,7 @@ fn generate_config(custom_path: Option<&std::path::Path>, force: bool) -> Result
             .map_err(|e| AppError::FileSystem(parent.to_path_buf(), e))?;
     }
 
-    let content = Config::generate_default_toml();
+    let content = Config::generate_default_toml()?;
     std::fs::write(&path, &content).map_err(|e| AppError::FileSystem(path.clone(), e))?;
 
     println!("config written to: {}", path.display());

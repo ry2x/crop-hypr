@@ -261,7 +261,7 @@ pub struct AppState {
     /// repeated renders so that wgpu surfaces that fail their first
     /// `compositor.present()` (SurfaceError::Outdated) get a second chance.
     repaint_ticks: u8,
-    pub glyphs: FreezeGlyphs,
+    glyphs: FreezeGlyphs,
 }
 
 impl AppState {
@@ -360,8 +360,8 @@ impl AppState {
     }
 
     fn toolbar(&self) -> Element<'_, Message> {
-        let btn = |label: String, mode: CaptureMode, active: bool| {
-            button(Text::new(label).size(22))
+        let btn = |label: &str, mode: CaptureMode, active: bool| {
+            button(Text::new(label.to_owned()).size(22))
                 .on_press(Message::ModeSelected(mode))
                 .style(if active {
                     button::primary
@@ -375,23 +375,23 @@ impl AppState {
             Row::new()
                 .spacing(8)
                 .push(btn(
-                    self.glyphs.crop.clone(),
+                    &self.glyphs.crop,
                     CaptureMode::Crop,
                     self.mode == CaptureMode::Crop,
                 ))
                 .push(btn(
-                    self.glyphs.window.clone(),
+                    &self.glyphs.window,
                     CaptureMode::Window,
                     self.mode == CaptureMode::Window,
                 ))
                 .push(btn(
-                    self.glyphs.monitor.clone(),
+                    &self.glyphs.monitor,
                     CaptureMode::Monitor,
                     self.mode == CaptureMode::Monitor,
                 ))
-                .push(btn(self.glyphs.all.clone(), CaptureMode::All, false))
+                .push(btn(&self.glyphs.all, CaptureMode::All, false))
                 .push(
-                    button(Text::new(self.glyphs.cancel.clone()).size(22))
+                    button(Text::new(self.glyphs.cancel.as_str()).size(22))
                         .on_press(Message::Cancel)
                         .style(button::danger)
                         .padding([10, 18]),

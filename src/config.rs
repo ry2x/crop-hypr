@@ -117,8 +117,9 @@ impl Config {
 
     /// Serialize the default config to a TOML string, suitable for writing to
     /// a config file. Used by the `generate-config` command.
-    pub fn generate_default_toml() -> String {
-        toml::to_string_pretty(&Self::default()).expect("default Config must be serializable")
+    pub fn generate_default_toml() -> Result<String> {
+        toml::to_string_pretty(&Self::default())
+            .map_err(|e| AppError::Config(format!("failed to serialize default config: {e}")))
     }
 
     fn validate(&self) -> Result<()> {
@@ -268,14 +269,15 @@ cancel  = "E"
 
     #[test]
     fn test_generate_default_toml_is_valid_toml() {
-        let s = Config::generate_default_toml();
+        let s = Config::generate_default_toml().expect("serialize");
         toml::from_str::<Config>(&s).expect("generated TOML must parse cleanly");
     }
 
     #[test]
     fn test_generate_default_toml_round_trips_all_fields() {
         let original = Config::default();
-        let parsed: Config = toml::from_str(&Config::generate_default_toml()).expect("parse");
+        let parsed: Config =
+            toml::from_str(&Config::generate_default_toml().expect("serialize")).expect("parse");
 
         assert_eq!(parsed.filename_pattern, original.filename_pattern);
         assert_eq!(parsed.freeze_glyphs.crop, original.freeze_glyphs.crop);
