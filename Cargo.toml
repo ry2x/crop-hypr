@@ -1,6 +1,6 @@
 [package]
 name = "crop-hypr"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 authors = ["ry2x"]
 description = "A fast, Hyprland-native screenshot tool written in Rust."
@@ -56,7 +56,6 @@ pipewire = "0.9"
 [profile.release]
 opt-level = 3
 lto = true
-codegen-units = 10
 panic = "abort"
 strip = "symbols"
 
