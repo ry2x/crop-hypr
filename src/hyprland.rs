@@ -17,6 +17,9 @@ pub struct ScreenRect {
 pub struct WindowInfo {
     pub rect: ScreenRect,
     pub title: String,
+    pub floating: bool,
+    /// Lower = more recently focused (0 = topmost floating window).
+    pub focus_history_id: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -45,12 +48,16 @@ pub struct HyprWorkspace {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct HyprClient {
     pub hidden: bool,
     pub workspace: HyprWorkspace,
     pub at: [i32; 2],
     pub size: [i32; 2],
     pub title: String,
+    pub floating: bool,
+    #[serde(rename = "focusHistoryID")]
+    pub focus_history_id: i64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -151,6 +158,8 @@ pub(crate) fn parse_windows(
                     h,
                 },
                 title: c.title,
+                floating: c.floating,
+                focus_history_id: c.focus_history_id,
             })
         })
         .collect()
@@ -189,6 +198,8 @@ mod tests {
                 at: [100, 100],
                 size: [800, 600],
                 title: "Visible Window".to_string(),
+                floating: false,
+                focus_history_id: 1,
             },
             HyprClient {
                 hidden: true,
@@ -196,6 +207,8 @@ mod tests {
                 at: [200, 200],
                 size: [800, 600],
                 title: "Hidden Window".to_string(),
+                floating: false,
+                focus_history_id: 2,
             },
             HyprClient {
                 hidden: false,
@@ -203,6 +216,8 @@ mod tests {
                 at: [300, 300],
                 size: [800, 600],
                 title: "Other Workspace Window".to_string(),
+                floating: false,
+                focus_history_id: 3,
             },
         ];
 

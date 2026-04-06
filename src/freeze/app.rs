@@ -511,7 +511,7 @@ fn draw_highlight(
             .with_width(stroke_w),
     );
 
-    if !label.is_empty() {
+    if hovered && !label.is_empty() {
         let font_size = (h * 0.12).clamp(12.0, 22.0);
         let cx = x + w * 0.5;
         let cy = y + h * 0.5;
@@ -519,25 +519,23 @@ fn draw_highlight(
             content: label.to_owned(),
             position: Point { x: cx, y: cy },
             size: iced::Pixels(font_size),
-            color: iced::Color::from_rgba(1.0, 1.0, 1.0, if hovered { 1.0 } else { 0.5 }),
+            color: iced::Color::from_rgba(1.0, 1.0, 1.0, 1.0),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Center,
             ..canvas::Text::default()
         });
 
-        if hovered {
-            frame.fill_text(canvas::Text {
-                content: "Click to capture".to_owned(),
-                position: Point {
-                    x: cx,
-                    y: cy + font_size * 0.7,
-                },
-                size: iced::Pixels((font_size * 0.45).clamp(10.0, 14.0)),
-                color: iced::Color::from_rgba(0.8, 0.9, 1.0, 0.9),
-                align_x: iced::alignment::Horizontal::Center.into(),
-                ..canvas::Text::default()
-            });
-        }
+        frame.fill_text(canvas::Text {
+            content: "Click to capture".to_owned(),
+            position: Point {
+                x: cx,
+                y: cy + font_size * 0.7,
+            },
+            size: iced::Pixels((font_size * 0.45).clamp(10.0, 14.0)),
+            color: iced::Color::from_rgba(0.8, 0.9, 1.0, 0.9),
+            align_x: iced::alignment::Horizontal::Center.into(),
+            ..canvas::Text::default()
+        });
     }
 }
 
@@ -634,10 +632,21 @@ fn hit_index(windows: &[WindowInfo], pos: Option<Point>, offset: Point) -> Optio
     // Convert canvas-local cursor to global for comparison with hyprctl rects
     let gx = p.x + offset.x;
     let gy = p.y + offset.y;
-    windows.iter().position(|w| {
-        let r = w.rect;
-        gx >= r.x as f32 && gx <= (r.x + r.w) as f32 && gy >= r.y as f32 && gy <= (r.y + r.h) as f32
-    })
+
+    // Single pass: floating windows sort before tiled (!floating = false < true),
+    // then by focus_history_id ascending (0 = most recently focused = topmost).
+    windows
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| {
+            let r = w.rect;
+            gx >= r.x as f32
+                && gx <= (r.x + r.w) as f32
+                && gy >= r.y as f32
+                && gy <= (r.y + r.h) as f32
+        })
+        .min_by_key(|(_, w)| (!w.floating, w.focus_history_id))
+        .map(|(i, _)| i)
 }
 
 fn hit_index_m(monitors: &[MonitorInfo], pos: Option<Point>, offset: Point) -> Option<usize> {
