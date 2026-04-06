@@ -131,7 +131,7 @@ cancel  = "󰖭"
 
 | キー | 型 | 既定値 | 説明 |
 | --- | --- | --- | --- |
-| `save_path` | path | `~/Pictures/Screenshots` | 保存先ディレクトリ |
+| `save_path` | path | XDG Pictures ディレクトリ + `/Screenshots`（fallback: `$HOME/Screenshots`） | 保存先ディレクトリ |
 | `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | ファイル名のstrftimeパターン（拡張子なし） |
 | `toolbar_position` | string | `top` | フリーズツールバーの表示位置: `top`, `bottom`, `left`, `right` |
 | `freeze_glyphs.crop` | string | `󰆟` (U+F019F) | cropモードのアイコン |

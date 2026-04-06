@@ -134,7 +134,7 @@ cancel  = "󰖭"
 
 | Key | Type | Default | Description |
 | --- | ---- | ------- | ----------- |
-| `save_path` | path | `~/Pictures/Screenshots` | Destination directory for saved screenshots |
+| `save_path` | path | XDG Pictures dir + `/Screenshots` (fallback: `$HOME/Screenshots`) | Destination directory for saved screenshots |
 | `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | strftime pattern for filenames (no extension) |
 | `toolbar_position` | string | `top` | Freeze toolbar edge: `top`, `bottom`, `left`, or `right` |
 | `freeze_glyphs.crop` | string | `󰆟` (U+F019F) | Toolbar icon for crop mode |
