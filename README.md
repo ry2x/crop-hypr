@@ -35,8 +35,20 @@ Window and monitor metadata is fetched directly via the **Hyprland IPC socket**
 ## Installation
 
 ```sh
+git clone https://github.com/ry2x/crop-hypr.git
+cd crop-hypr
 cargo build --release
 cp target/release/crop-hypr ~/.local/bin/
+```
+
+### For Arch Linux users
+
+A PKGBUILD is included for building an Arch package.
+
+```sh
+git clone https://github.com/ry2x/crop-hypr.git
+cd crop-hypr
+makepkg -si
 ```
 
 ## Usage
@@ -86,9 +98,9 @@ Icon glyphs can be customized in the config file. Check the [configuration secti
 
 ```ini
 # ~/.config/hypr/hyprland.conf
-bind = , Print,       exec, crop-hypr freeze
-bind = SHIFT, Print,  exec, crop-hypr crop
-bind = CTRL, Print,   exec, crop-hypr window
+bindd = SUPER, S, ScreenshotMonitor,    exec, crop-hypr monitor
+bindd = SUPER SHIFT, S, FreezeMode,     exec, crop-hypr freeze
+bindd = , Print, ScreenshotFull,        exec, crop-hypr all
 ```
 
 ## Configuration
