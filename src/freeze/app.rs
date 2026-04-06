@@ -343,32 +343,21 @@ impl AppState {
 
         let toolbar = self.toolbar();
 
-        let positioned_toolbar: Element<'_, Message> = match self.toolbar_position {
-            ToolbarPosition::Top => Container::new(toolbar)
-                .width(Length::Fill)
-                .align_x(iced::alignment::Horizontal::Center)
-                .align_top(Length::Shrink)
-                .padding(12)
-                .into(),
-            ToolbarPosition::Bottom => Container::new(toolbar)
-                .width(Length::Fill)
-                .align_x(iced::alignment::Horizontal::Center)
-                .align_bottom(Length::Shrink)
-                .padding(12)
-                .into(),
-            ToolbarPosition::Left => Container::new(toolbar)
-                .height(Length::Fill)
-                .align_y(iced::alignment::Vertical::Center)
-                .align_left(Length::Shrink)
-                .padding(12)
-                .into(),
-            ToolbarPosition::Right => Container::new(toolbar)
-                .height(Length::Fill)
-                .align_y(iced::alignment::Vertical::Center)
-                .align_right(Length::Shrink)
-                .padding(12)
-                .into(),
-        };
+        let positioned_toolbar: Element<'_, Message> = Container::new(toolbar)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(12)
+            .align_x(match self.toolbar_position {
+                ToolbarPosition::Left => iced::alignment::Horizontal::Left,
+                ToolbarPosition::Right => iced::alignment::Horizontal::Right,
+                _ => iced::alignment::Horizontal::Center,
+            })
+            .align_y(match self.toolbar_position {
+                ToolbarPosition::Top => iced::alignment::Vertical::Top,
+                ToolbarPosition::Bottom => iced::alignment::Vertical::Bottom,
+                _ => iced::alignment::Vertical::Center,
+            })
+            .into();
 
         stack![
             Image::new(self.monitor_images[mon_idx].clone())

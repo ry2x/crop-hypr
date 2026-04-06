@@ -329,6 +329,7 @@ cancel  = "E"
         assert_eq!(parsed.freeze_glyphs.monitor, original.freeze_glyphs.monitor);
         assert_eq!(parsed.freeze_glyphs.all, original.freeze_glyphs.all);
         assert_eq!(parsed.freeze_glyphs.cancel, original.freeze_glyphs.cancel);
+        assert_eq!(parsed.toolbar_position, original.toolbar_position);
     }
 
     // ── load_from ─────────────────────────────────────────────────────────────
