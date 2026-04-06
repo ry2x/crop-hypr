@@ -9,13 +9,13 @@ use iced::{
     keyboard::{Event as KeyEvent, Key, key::Named},
     mouse,
     widget::{
-        Canvas, Container, Row, Text, button, canvas,
+        Canvas, Column, Container, Row, Text, button, canvas,
         image::{self, Image},
         stack,
     },
 };
 
-use crate::config::FreezeGlyphs;
+use crate::config::{FreezeGlyphs, ToolbarPosition};
 use crate::hyprland::{MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
@@ -262,6 +262,7 @@ pub struct AppState {
     /// `compositor.present()` (SurfaceError::Outdated) get a second chance.
     repaint_ticks: u8,
     glyphs: FreezeGlyphs,
+    toolbar_position: ToolbarPosition,
 }
 
 impl AppState {
@@ -273,6 +274,7 @@ impl AppState {
         monitors: Arc<Vec<MonitorInfo>>,
         result: Arc<Mutex<Option<Option<ScreenRect>>>>,
         glyphs: FreezeGlyphs,
+        toolbar_position: ToolbarPosition,
     ) -> Self {
         Self {
             mode: CaptureMode::Crop,
@@ -282,10 +284,9 @@ impl AppState {
             windows,
             monitors,
             result,
-            // Give every window up to ~300 ms of forced redraws so that wgpu
-            // surfaces that initially fail `present()` recover without a click.
             repaint_ticks: 6,
             glyphs,
+            toolbar_position,
         }
     }
 
@@ -342,6 +343,22 @@ impl AppState {
 
         let toolbar = self.toolbar();
 
+        let positioned_toolbar: Element<'_, Message> = Container::new(toolbar)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(12)
+            .align_x(match self.toolbar_position {
+                ToolbarPosition::Left => iced::alignment::Horizontal::Left,
+                ToolbarPosition::Right => iced::alignment::Horizontal::Right,
+                _ => iced::alignment::Horizontal::Center,
+            })
+            .align_y(match self.toolbar_position {
+                ToolbarPosition::Top => iced::alignment::Vertical::Top,
+                ToolbarPosition::Bottom => iced::alignment::Vertical::Bottom,
+                _ => iced::alignment::Vertical::Center,
+            })
+            .into();
+
         stack![
             Image::new(self.monitor_images[mon_idx].clone())
                 .width(Length::Fill)
@@ -350,11 +367,7 @@ impl AppState {
             Canvas::new(canvas_prog)
                 .width(Length::Fill)
                 .height(Length::Fill),
-            Container::new(toolbar)
-                .width(Length::Fill)
-                .align_x(iced::alignment::Horizontal::Center)
-                .align_top(Length::Shrink)
-                .padding(12),
+            positioned_toolbar,
         ]
         .into()
     }
@@ -370,8 +383,38 @@ impl AppState {
                 })
                 .padding([10, 18])
         };
+        let cancel_btn = button(Text::new(self.glyphs.cancel.as_str()).size(22))
+            .on_press(Message::Cancel)
+            .style(button::danger)
+            .padding([10, 18]);
 
-        Container::new(
+        let vertical = matches!(
+            self.toolbar_position,
+            ToolbarPosition::Left | ToolbarPosition::Right
+        );
+
+        let buttons: Element<'_, Message> = if vertical {
+            Column::new()
+                .spacing(8)
+                .push(btn(
+                    &self.glyphs.crop,
+                    CaptureMode::Crop,
+                    self.mode == CaptureMode::Crop,
+                ))
+                .push(btn(
+                    &self.glyphs.window,
+                    CaptureMode::Window,
+                    self.mode == CaptureMode::Window,
+                ))
+                .push(btn(
+                    &self.glyphs.monitor,
+                    CaptureMode::Monitor,
+                    self.mode == CaptureMode::Monitor,
+                ))
+                .push(btn(&self.glyphs.all, CaptureMode::All, false))
+                .push(cancel_btn)
+                .into()
+        } else {
             Row::new()
                 .spacing(8)
                 .push(btn(
@@ -390,25 +433,23 @@ impl AppState {
                     self.mode == CaptureMode::Monitor,
                 ))
                 .push(btn(&self.glyphs.all, CaptureMode::All, false))
-                .push(
-                    button(Text::new(self.glyphs.cancel.as_str()).size(22))
-                        .on_press(Message::Cancel)
-                        .style(button::danger)
-                        .padding([10, 18]),
-                ),
-        )
-        .style(|_theme| iced::widget::container::Style {
-            background: Some(iced::Background::Color(iced::Color::from_rgba(
-                0.08, 0.08, 0.08, 0.85,
-            ))),
-            border: iced::Border {
-                radius: 12.0.into(),
+                .push(cancel_btn)
+                .into()
+        };
+
+        Container::new(buttons)
+            .style(|_theme| iced::widget::container::Style {
+                background: Some(iced::Background::Color(iced::Color::from_rgba(
+                    0.08, 0.08, 0.08, 0.85,
+                ))),
+                border: iced::Border {
+                    radius: 12.0.into(),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        })
-        .padding([8, 14])
-        .into()
+            })
+            .padding([8, 14])
+            .into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {

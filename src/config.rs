@@ -52,6 +52,19 @@ impl Default for FreezeGlyphs {
     }
 }
 
+// ── Toolbar position ──────────────────────────────────────────────────────────
+
+/// Edge of the screen where the freeze-mode toolbar is docked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ToolbarPosition {
+    #[default]
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +77,9 @@ pub struct Config {
 
     #[serde(default)]
     pub freeze_glyphs: FreezeGlyphs,
+
+    #[serde(default)]
+    pub toolbar_position: ToolbarPosition,
 }
 
 fn default_save_path() -> PathBuf {
@@ -82,6 +98,7 @@ impl Default for Config {
             save_path: default_save_path(),
             filename_pattern: default_filename_pattern(),
             freeze_glyphs: FreezeGlyphs::default(),
+            toolbar_position: ToolbarPosition::default(),
         }
     }
 }
@@ -265,6 +282,33 @@ cancel  = "E"
         assert_eq!(cfg.freeze_glyphs.cancel, "E");
     }
 
+    // ── toolbar_position ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_toolbar_position_default_is_top() {
+        assert_eq!(Config::default().toolbar_position, ToolbarPosition::Top);
+    }
+
+    #[test]
+    fn test_toolbar_position_deserializes_all_variants() {
+        for (s, expected) in [
+            ("top", ToolbarPosition::Top),
+            ("bottom", ToolbarPosition::Bottom),
+            ("left", ToolbarPosition::Left),
+            ("right", ToolbarPosition::Right),
+        ] {
+            let toml = format!("toolbar_position = \"{s}\"");
+            let cfg: Config = toml::from_str(&toml).unwrap();
+            assert_eq!(cfg.toolbar_position, expected, "failed for {s}");
+        }
+    }
+
+    #[test]
+    fn test_toolbar_position_missing_defaults_to_top() {
+        let cfg: Config = toml::from_str("").unwrap();
+        assert_eq!(cfg.toolbar_position, ToolbarPosition::Top);
+    }
+
     // ── generate_default_toml ─────────────────────────────────────────────────
 
     #[test]
@@ -285,6 +329,7 @@ cancel  = "E"
         assert_eq!(parsed.freeze_glyphs.monitor, original.freeze_glyphs.monitor);
         assert_eq!(parsed.freeze_glyphs.all, original.freeze_glyphs.all);
         assert_eq!(parsed.freeze_glyphs.cancel, original.freeze_glyphs.cancel);
+        assert_eq!(parsed.toolbar_position, original.toolbar_position);
     }
 
     // ── load_from ─────────────────────────────────────────────────────────────
