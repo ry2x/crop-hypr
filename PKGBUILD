@@ -16,6 +16,11 @@ build() {
     cd "$startdir"
     export RUSTUP_TOOLCHAIN=stable
     export CARGO_TARGET_DIR=target
+    # GCC LTO (-flto=auto) produces GCC IR objects incompatible with Rust's lld.
+    # -ffat-lto-objects includes regular machine code alongside LTO IR so lld
+    # can resolve symbols from C dependencies (e.g. libspa).
+    export CFLAGS+=" -ffat-lto-objects"
+    export CXXFLAGS+=" -ffat-lto-objects"
     cargo build --frozen --release
 }
 
