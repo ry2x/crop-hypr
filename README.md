@@ -2,6 +2,8 @@
 
 A fast, Hyprland-native screenshot tool written in Rust.
 
+日本語版README: [README.ja.md](./README.ja.md)
+
 ## Features
 
 - **Immediate capture** — crop region, active window, focused monitor, or all monitors
@@ -9,8 +11,7 @@ A fast, Hyprland-native screenshot tool written in Rust.
 - **Freeze mode** — freeze the screen and interactively select what to capture via an overlay UI (similar to Windows Win+Shift+S Clipping Tool)
 - Automatic clipboard copy via `wl-copy`
 - Desktop notification on success/failure
-- Configurable save path, filename pattern, and freeze toolbar glyphs
-- `generate-config` command to scaffold a default config file
+- Configurable save path, filename pattern, freeze toolbar glyphs, and toolbar position
 
 ## Requirements
 
@@ -115,11 +116,15 @@ save_path = "~/Pictures/Screenshots"
 # Default: "hyprsnap_%Y%m%d_%H%M%S"
 filename_pattern = "screenshot_%Y-%m-%d_%H-%M-%S"
 
+# Edge of the screen where the freeze mode toolbar is docked.
+# Options: "top" | "bottom" | "left" | "right"  (default: "top")
+toolbar_position = "top"
+
 # Glyphs shown in the freeze mode toolbar.
 # Requires a Nerd Font. Override individual icons as needed.
 [freeze_glyphs]
 crop    = "󰆟"
-window  = ""
+window  = ""
 monitor = "󰍹"
 all     = "󰁌"
 cancel  = "󰖭"
@@ -131,6 +136,7 @@ cancel  = "󰖭"
 | --- | ---- | ------- | ----------- |
 | `save_path` | path | `~/Pictures/Screenshots` | Destination directory for saved screenshots |
 | `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | strftime pattern for filenames (no extension) |
+| `toolbar_position` | string | `top` | Freeze toolbar edge: `top`, `bottom`, `left`, or `right` |
 | `freeze_glyphs.crop` | string | `󰆟` (U+F019F) | Toolbar icon for crop mode |
 | `freeze_glyphs.window` | string | `` (U+EB7F) | Toolbar icon for window mode |
 | `freeze_glyphs.monitor` | string | `󰍹` (U+F0379) | Toolbar icon for monitor mode |
