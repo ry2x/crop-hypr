@@ -633,43 +633,20 @@ fn hit_index(windows: &[WindowInfo], pos: Option<Point>, offset: Point) -> Optio
     let gx = p.x + offset.x;
     let gy = p.y + offset.y;
 
-    let hits: Vec<usize> = windows
+    // Single pass: floating windows sort before tiled (!floating = false < true),
+    // then by focus_history_id ascending (0 = most recently focused = topmost).
+    windows
         .iter()
         .enumerate()
-        .filter_map(|(i, w)| {
+        .filter(|(_, w)| {
             let r = w.rect;
-            if gx >= r.x as f32
+            gx >= r.x as f32
                 && gx <= (r.x + r.w) as f32
                 && gy >= r.y as f32
                 && gy <= (r.y + r.h) as f32
-            {
-                Some(i)
-            } else {
-                None
-            }
         })
-        .collect();
-
-    if hits.is_empty() {
-        return None;
-    }
-
-    // Floating windows always render above tiled ones.
-    // Among floats, the lowest focusHistoryID = most recently focused = topmost.
-    let floating_hits: Vec<usize> = hits
-        .iter()
-        .copied()
-        .filter(|&i| windows[i].floating)
-        .collect();
-
-    if !floating_hits.is_empty() {
-        return floating_hits
-            .into_iter()
-            .min_by_key(|&i| windows[i].focus_history_id);
-    }
-
-    // No floating hit — return first tiled match
-    hits.into_iter().next()
+        .min_by_key(|(_, w)| (!w.floating, w.focus_history_id))
+        .map(|(i, _)| i)
 }
 
 fn hit_index_m(monitors: &[MonitorInfo], pos: Option<Point>, offset: Point) -> Option<usize> {
