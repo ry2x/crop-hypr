@@ -86,6 +86,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         let wins = Arc::new(windows);
         let mons = Arc::new(monitors);
         let glyphs = cfg.freeze_glyphs.clone();
+        let toolbar_position = cfg.toolbar_position;
 
         iced_layershell::daemon(
             move || {
@@ -107,6 +108,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     Arc::clone(&mons),
                     result_clone.clone(),
                     glyphs.clone(),
+                    toolbar_position,
                 );
                 (state, Task::batch(spawn_tasks))
             },
