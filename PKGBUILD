@@ -9,11 +9,17 @@ url="https://github.com/ry2x/crop-hypr"
 license=('MIT')
 depends=('slurp' 'wl-clipboard' 'hyprland' 'libnotify' 'pipewire')
 makedepends=('rust' 'cargo' 'clang' 'pkgconf')
-source=()
-sha256sums=()
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
 
 build() {
-    cd "$startdir"
+    cd "$pkgname-$pkgver"
     export RUSTUP_TOOLCHAIN=stable
     export CARGO_TARGET_DIR=target
     # GCC LTO (-flto=auto) produces GCC IR objects incompatible with Rust's lld.
@@ -25,13 +31,13 @@ build() {
 }
 
 check() {
-    cd "$startdir"
+    cd "$pkgname-$pkgver"
     export RUSTUP_TOOLCHAIN=stable
     cargo test --frozen
 }
 
 package() {
-    cd "$startdir"
+    cd "$pkgname-$pkgver"
     install -Dm755 "target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
     install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }
