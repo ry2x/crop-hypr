@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -8,17 +8,88 @@ use crate::error::{AppError, Result};
 
 // ── RGBA color ────────────────────────────────────────────────────────────────
 
-/// An RGBA color stored as `[red, green, blue, alpha]` with each component in
-/// `[0.0, 1.0]`. Serialised and deserialised as a TOML array of four floats,
-/// e.g. `[0.27, 0.52, 1.0, 0.55]`.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(transparent)]
+/// An RGBA color stored internally as `[red, green, blue, alpha]` floats in
+/// `[0.0, 1.0]`.
+///
+/// In TOML / config files the color is expressed as a CSS-style hex string:
+///
+/// | Format       | Example       | Alpha         |
+/// |------------- |-------------- |-------------- |
+/// | `"#RRGGBBAA"` | `"#4585FF8C"` | from last two digits |
+/// | `"#RRGGBB"`   | `"#4585FF"`   | `FF` (fully opaque) |
+/// | `"#RGBA"`     | `"#458F"`     | short form, each digit doubled |
+/// | `"#RGB"`      | `"#45F"`      | short form, alpha = `FF` |
+///
+/// Parsing is case-insensitive.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RgbaColor(pub [f32; 4]);
 
 impl RgbaColor {
     pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self([r, g, b, a])
     }
+}
+
+impl Serialize for RgbaColor {
+    fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        let [r, g, b, a] = self.0;
+        let to_u8 = |f: f32| (f.clamp(0.0, 1.0) * 255.0).round() as u8;
+        s.serialize_str(&format!(
+            "#{:02X}{:02X}{:02X}{:02X}",
+            to_u8(r),
+            to_u8(g),
+            to_u8(b),
+            to_u8(a)
+        ))
+    }
+}
+
+impl<'de> Deserialize<'de> for RgbaColor {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        parse_hex_color(&s).map_err(de::Error::custom)
+    }
+}
+
+fn parse_hex_color(s: &str) -> std::result::Result<RgbaColor, String> {
+    let s = s.trim();
+    let hex = s
+        .strip_prefix('#')
+        .ok_or_else(|| format!("color must start with '#', got {s:?}"))?;
+
+    let from_u8 = |b: u8| b as f32 / 255.0;
+    // Expand a single nibble to a full byte: 0xA → 0xAA
+    let expand = |h: u8| h << 4 | h;
+
+    let digits: Vec<u8> = hex
+        .chars()
+        .map(|c| {
+            c.to_digit(16)
+                .map(|d| d as u8)
+                .ok_or_else(|| format!("invalid hex digit {c:?} in {s:?}"))
+        })
+        .collect::<std::result::Result<_, _>>()?;
+
+    let [r, g, b, a] = match digits.as_slice() {
+        [r, g, b] => [expand(*r), expand(*g), expand(*b), 0xFF],
+        [r, g, b, a] => [expand(*r), expand(*g), expand(*b), expand(*a)],
+        [r1, r2, g1, g2, b1, b2] => [r1 << 4 | r2, g1 << 4 | g2, b1 << 4 | b2, 0xFF],
+        [r1, r2, g1, g2, b1, b2, a1, a2] => {
+            [r1 << 4 | r2, g1 << 4 | g2, b1 << 4 | b2, a1 << 4 | a2]
+        }
+        _ => {
+            return Err(format!(
+                "expected #RGB, #RGBA, #RRGGBB, or #RRGGBBAA, got {s:?}"
+            ));
+        }
+    };
+
+    Ok(RgbaColor::new(
+        from_u8(r),
+        from_u8(g),
+        from_u8(b),
+        from_u8(a),
+    ))
 }
 
 // ── Freeze mode color config ──────────────────────────────────────────────────
@@ -507,7 +578,119 @@ mod tests {
         f
     }
 
-    // ── default values ────────────────────────────────────────────────────────
+    // ── RgbaColor parsing ─────────────────────────────────────────────────────
+
+    fn approx_eq(a: f32, b: f32) -> bool {
+        (a - b).abs() < 1.0 / 255.0
+    }
+
+    #[test]
+    fn test_rgba_rrggbbaa() {
+        let c = parse_hex_color("#4585FF8C").unwrap();
+        assert!(approx_eq(c.0[0], 0x45 as f32 / 255.0));
+        assert!(approx_eq(c.0[1], 0x85 as f32 / 255.0));
+        assert!(approx_eq(c.0[2], 0xFF as f32 / 255.0));
+        assert!(approx_eq(c.0[3], 0x8C as f32 / 255.0));
+    }
+
+    #[test]
+    fn test_rgba_rrggbb_alpha_is_ff() {
+        let c = parse_hex_color("#4585FF").unwrap();
+        assert!(approx_eq(c.0[2], 1.0));
+        assert!(approx_eq(c.0[3], 1.0), "alpha should be FF = 1.0");
+    }
+
+    #[test]
+    fn test_rgba_rgb_shorthand() {
+        let c = parse_hex_color("#F80").unwrap();
+        assert!(approx_eq(c.0[0], 0xFF as f32 / 255.0));
+        assert!(approx_eq(c.0[1], 0x88 as f32 / 255.0));
+        assert!(approx_eq(c.0[2], 0x00 as f32 / 255.0));
+        assert!(approx_eq(c.0[3], 1.0));
+    }
+
+    #[test]
+    fn test_rgba_rgba_shorthand() {
+        let c = parse_hex_color("#F80A").unwrap();
+        assert!(approx_eq(c.0[0], 0xFF as f32 / 255.0));
+        assert!(approx_eq(c.0[1], 0x88 as f32 / 255.0));
+        assert!(approx_eq(c.0[2], 0x00 as f32 / 255.0));
+        assert!(approx_eq(c.0[3], 0xAA as f32 / 255.0));
+    }
+
+    #[test]
+    fn test_rgba_lowercase() {
+        let upper = parse_hex_color("#4585ff8c").unwrap();
+        let lower = parse_hex_color("#4585FF8C").unwrap();
+        assert_eq!(upper, lower);
+    }
+
+    #[test]
+    fn test_rgba_missing_hash_is_error() {
+        assert!(parse_hex_color("4585FF8C").is_err());
+    }
+
+    #[test]
+    fn test_rgba_invalid_digit_is_error() {
+        assert!(parse_hex_color("#GGGGGGGG").is_err());
+    }
+
+    #[test]
+    fn test_rgba_wrong_length_is_error() {
+        assert!(parse_hex_color("#12345").is_err()); // 5 digits
+        assert!(parse_hex_color("#1234567").is_err()); // 7 digits
+    }
+
+    #[test]
+    fn test_rgba_serialize_round_trip() {
+        #[derive(Serialize, Deserialize)]
+        struct W {
+            c: RgbaColor,
+        }
+
+        let original = RgbaColor::new(
+            0x45 as f32 / 255.0,
+            0x85 as f32 / 255.0,
+            1.0,
+            0x8C as f32 / 255.0,
+        );
+        let s = toml::to_string(&W { c: original }).unwrap();
+        assert!(s.contains('#'), "serialized form should contain '#': {s}");
+        let back: W = toml::from_str(&s).unwrap();
+        assert_eq!(original, back.c);
+    }
+
+    #[test]
+    fn test_freeze_colors_deserialize_from_hex() {
+        // Use r##"..."## so that "#RRGGBBAA" inside doesn't close the delimiter
+        let toml_str = r##"
+[freeze_colors.window_frame]
+fill_hovered = "#4585FF8C"
+stroke_hovered = "#4D99FFFF"
+"##;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+        let wf = cfg.freeze_colors.window_frame;
+        assert!(approx_eq(wf.fill_hovered.0[3], 0x8C as f32 / 255.0));
+        assert!(approx_eq(wf.stroke_hovered.0[3], 1.0));
+    }
+
+    #[test]
+    fn test_default_colors_round_trip() {
+        let s = Config::generate_default_toml().unwrap();
+        let back: Config = toml::from_str(&s).unwrap();
+        let d = Config::default();
+        // Hex format has 8-bit precision; compare with 1/255 tolerance
+        let a = back.freeze_colors.window_frame.fill_hovered.0;
+        let b = d.freeze_colors.window_frame.fill_hovered.0;
+        for i in 0..4 {
+            assert!(
+                approx_eq(a[i], b[i]),
+                "channel {i}: {:.4} != {:.4}",
+                a[i],
+                b[i]
+            );
+        }
+    }
 
     #[test]
     fn test_default_config_save_path() {
