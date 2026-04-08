@@ -11,7 +11,7 @@ A fast, Hyprland-native screenshot tool written in Rust.
 - **Freeze mode** — freeze the screen and interactively select what to capture via an overlay UI (similar to Windows Win+Shift+S Clipping Tool)
 - Automatic clipboard copy via `wl-copy`
 - Desktop notification on success/failure
-- Configurable save path, filename pattern, freeze toolbar glyphs, and toolbar position
+- Configurable save path, filename pattern, freeze toolbar glyphs, toolbar position, and window border inclusion
 
 ## Requirements
 
@@ -132,6 +132,13 @@ filename_pattern = "screenshot_%Y-%m-%d_%H-%M-%S"
 # Options: "top" | "bottom" | "left" | "right"  (default: "top")
 toolbar_position = "top"
 
+# When true, window captures (both immediate `window` and freeze-mode Window
+# selection) include the Hyprland border, expanding the crop area by
+# `general:border_size` on each side. The freeze-mode overlay also draws
+# rounded highlight frames matching `decoration:rounding`.
+# Default: false
+capture_window_border = true
+
 # Glyphs shown in the freeze mode toolbar.
 # Requires a Nerd Font. Override individual icons as needed.
 [freeze_glyphs]
@@ -149,6 +156,7 @@ cancel  = "󰖭"
 | `save_path` | path | XDG Pictures dir + `/Screenshots` (fallback: `$HOME/Screenshots`) | Destination directory for saved screenshots |
 | `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | strftime pattern for filenames (no extension) |
 | `toolbar_position` | string | `top` | Freeze toolbar edge: `top`, `bottom`, `left`, or `right` |
+| `capture_window_border` | bool | `true` | Include Hyprland window border in window captures; also draws rounded highlights in freeze mode |
 | `freeze_glyphs.crop` | string | `󰆟` (U+F019F) | Toolbar icon for crop mode |
 | `freeze_glyphs.window` | string | `` (U+EB7F) | Toolbar icon for window mode |
 | `freeze_glyphs.monitor` | string | `󰍹` (U+F0379) | Toolbar icon for monitor mode |
