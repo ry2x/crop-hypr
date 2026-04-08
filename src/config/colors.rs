@@ -360,3 +360,124 @@ pub struct FreezeColors {
     #[serde(default)]
     pub crop_frame: CropFrameColors,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    fn approx_eq(a: f32, b: f32) -> bool {
+        (a - b).abs() < 1.0 / 255.0
+    }
+
+    // ── RgbaColor parsing ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_rgba_rrggbbaa() {
+        let c = parse_hex_color("#4585FF8C").unwrap();
+        assert!(approx_eq(c.0[0], 0x45 as f32 / 255.0));
+        assert!(approx_eq(c.0[1], 0x85 as f32 / 255.0));
+        assert!(approx_eq(c.0[2], 0xFF as f32 / 255.0));
+        assert!(approx_eq(c.0[3], 0x8C as f32 / 255.0));
+    }
+
+    #[test]
+    fn test_rgba_rrggbb_alpha_is_ff() {
+        let c = parse_hex_color("#4585FF").unwrap();
+        assert!(approx_eq(c.0[2], 1.0));
+        assert!(approx_eq(c.0[3], 1.0), "alpha should be FF = 1.0");
+    }
+
+    #[test]
+    fn test_rgba_rgb_shorthand() {
+        let c = parse_hex_color("#F80").unwrap();
+        assert!(approx_eq(c.0[0], 0xFF as f32 / 255.0));
+        assert!(approx_eq(c.0[1], 0x88 as f32 / 255.0));
+        assert!(approx_eq(c.0[2], 0x00 as f32 / 255.0));
+        assert!(approx_eq(c.0[3], 1.0));
+    }
+
+    #[test]
+    fn test_rgba_rgba_shorthand() {
+        let c = parse_hex_color("#F80A").unwrap();
+        assert!(approx_eq(c.0[0], 0xFF as f32 / 255.0));
+        assert!(approx_eq(c.0[1], 0x88 as f32 / 255.0));
+        assert!(approx_eq(c.0[2], 0x00 as f32 / 255.0));
+        assert!(approx_eq(c.0[3], 0xAA as f32 / 255.0));
+    }
+
+    #[test]
+    fn test_rgba_lowercase() {
+        let upper = parse_hex_color("#4585ff8c").unwrap();
+        let lower = parse_hex_color("#4585FF8C").unwrap();
+        assert_eq!(upper, lower);
+    }
+
+    #[test]
+    fn test_rgba_missing_hash_is_error() {
+        assert!(parse_hex_color("4585FF8C").is_err());
+    }
+
+    #[test]
+    fn test_rgba_invalid_digit_is_error() {
+        assert!(parse_hex_color("#GGGGGGGG").is_err());
+    }
+
+    #[test]
+    fn test_rgba_wrong_length_is_error() {
+        assert!(parse_hex_color("#12345").is_err()); // 5 digits
+        assert!(parse_hex_color("#1234567").is_err()); // 7 digits
+    }
+
+    #[test]
+    fn test_rgba_serialize_round_trip() {
+        #[derive(Serialize, Deserialize)]
+        struct W {
+            c: RgbaColor,
+        }
+
+        let original = RgbaColor::new(
+            0x45 as f32 / 255.0,
+            0x85 as f32 / 255.0,
+            1.0,
+            0x8C as f32 / 255.0,
+        );
+        let s = toml::to_string(&W { c: original }).unwrap();
+        assert!(s.contains('#'), "serialized form should contain '#': {s}");
+        let back: W = toml::from_str(&s).unwrap();
+        assert_eq!(original, back.c);
+    }
+
+    // ── FreezeColors ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_freeze_colors_deserialize_from_hex() {
+        let toml_str = r##"
+[window_frame]
+fill_hovered = "#4585FF8C"
+stroke_hovered = "#4D99FFFF"
+"##;
+        let fc: FreezeColors = toml::from_str(toml_str).unwrap();
+        let wf = fc.window_frame;
+        assert!(approx_eq(wf.fill_hovered.0[3], 0x8C as f32 / 255.0));
+        assert!(approx_eq(wf.stroke_hovered.0[3], 1.0));
+    }
+
+    #[test]
+    fn test_default_colors_round_trip() {
+        let original = FreezeColors::default();
+        let s = toml::to_string_pretty(&original).unwrap();
+        let back: FreezeColors = toml::from_str(&s).unwrap();
+        // Hex format has 8-bit precision; compare with 1/255 tolerance
+        let a = back.window_frame.fill_hovered.0;
+        let b = original.window_frame.fill_hovered.0;
+        for i in 0..4 {
+            assert!(
+                approx_eq(a[i], b[i]),
+                "channel {i}: {:.4} != {:.4}",
+                a[i],
+                b[i]
+            );
+        }
+    }
+}
