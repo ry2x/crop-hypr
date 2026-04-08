@@ -133,7 +133,7 @@ toolbar_position = "top"
 # Hyprlandのウィンドウ枠を含めます。`general:border_size`分だけ各辺を拡張してキャプチャします。
 # フリーズモードのオーバーレイでは`decoration:rounding`に合わせた角丸のハイライト枠を表示します。
 # 既定値: false
-capture_window_border = true
+# capture_window_border = false
 
 # フリーズモードのツールバーに表示されるグリフ。
 # 既定値はNerd Fontが必要です。必要に応じて個別のアイコンを上書きしてください。

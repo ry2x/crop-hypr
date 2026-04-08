@@ -137,7 +137,7 @@ toolbar_position = "top"
 # `general:border_size` on each side. The freeze-mode overlay also draws
 # rounded highlight frames matching `decoration:rounding`.
 # Default: false
-capture_window_border = true
+# capture_window_border = false
 
 # Glyphs shown in the freeze mode toolbar.
 # Requires a Nerd Font. Override individual icons as needed.
