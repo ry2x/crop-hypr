@@ -151,7 +151,8 @@ pub struct ButtonColors {
     pub hover_text: RgbaColor,
 }
 fn default_btn_idle_bg() -> RgbaColor {
-    RgbaColor::new(0.20, 0.20, 0.20, 1.0)
+    // Matches iced Dark theme secondary.base (~#797A7D)
+    RgbaColor::new(0.475, 0.481, 0.494, 1.0)
 }
 fn default_btn_idle_text() -> RgbaColor {
     RgbaColor::new(0.90, 0.90, 0.90, 1.0)

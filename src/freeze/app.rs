@@ -410,7 +410,7 @@ impl AppState {
             };
             let hover_bg = btn_colors.hover_background;
             let hover_text = btn_colors.hover_text;
-            button(Text::new(label.to_owned()).size(22))
+            button(Text::new(label.to_owned()).size(26))
                 .on_press(Message::ModeSelected(mode))
                 .style(move |_theme, status| {
                     let (bg, text) = match status {
@@ -421,7 +421,7 @@ impl AppState {
                         background: Some(iced::Background::Color(to_iced(bg))),
                         text_color: to_iced(text),
                         border: iced::Border {
-                            radius: 8.0.into(),
+                            radius: 2.0.into(),
                             ..Default::default()
                         },
                         ..Default::default()
@@ -436,7 +436,7 @@ impl AppState {
             let idle_text = cancel_colors.idle_text;
             let hover_bg = cancel_colors.hover_background;
             let hover_text = cancel_colors.hover_text;
-            button(Text::new(self.glyphs.cancel.as_str()).size(22))
+            button(Text::new(self.glyphs.cancel.as_str()).size(26))
                 .on_press(Message::Cancel)
                 .style(move |_theme, status| {
                     let (bg, text) = match status {
@@ -447,7 +447,7 @@ impl AppState {
                         background: Some(iced::Background::Color(to_iced(bg))),
                         text_color: to_iced(text),
                         border: iced::Border {
-                            radius: 8.0.into(),
+                            radius: 2.0.into(),
                             ..Default::default()
                         },
                         ..Default::default()
