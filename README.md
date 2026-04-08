@@ -187,7 +187,7 @@ cancel  = "󰖭"
 # stroke_hovered = "#4D99FFFF"
 # label_text     = "#FFFFFFFF"
 # hint_text      = "#CCE6FFE6"  # "Click to capture"
-# name_text_idle = "#FFFFFF80"  # monitor name when not hovered  # monitor name when not hovered
+# name_text_idle = "#FFFFFF80"  # monitor name when not hovered
 
 # [freeze_colors.crop_frame]
 # stroke     = "#FFFFFFFF"
