@@ -159,7 +159,7 @@ cancel  = "󰖭"
 # background = "#141414D9"  # toolbar pill background
 
 # [freeze_colors.button]
-# idle_background   = "#333333FF"
+# idle_background   = "#797A7DFF"
 # idle_text         = "#E6E6E6FF"
 # active_background = "#5865F2FF"
 # active_text       = "#FFFFFFFF"
@@ -209,7 +209,7 @@ cancel  = "󰖭"
 | `freeze_glyphs.cancel` | string | `󰖭` (U+F05AD) | Toolbar icon for cancel button |
 | `freeze_colors.overlay.background` | string (hex) | `"#00000059"` | Dim fill over frozen screen |
 | `freeze_colors.toolbar.background` | string (hex) | `"#141414D9"` | Toolbar pill background |
-| `freeze_colors.button.idle_background` | string (hex) | `"#333333FF"` | Mode button — unselected background |
+| `freeze_colors.button.idle_background` | string (hex) | `"#797A7DFF"` | Mode button — unselected background |
 | `freeze_colors.button.idle_text` | string (hex) | `"#E6E6E6FF"` | Mode button — unselected text |
 | `freeze_colors.button.active_background` | string (hex) | `"#5865F2FF"` | Mode button — selected background |
 | `freeze_colors.button.active_text` | string (hex) | `"#FFFFFFFF"` | Mode button — selected text |

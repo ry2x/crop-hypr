@@ -155,7 +155,7 @@ cancel  = "󰖭"
 # background = "#141414D9"  # ツールバーの背景
 
 # [freeze_colors.button]
-# idle_background   = "#333333FF"
+# idle_background   = "#797A7DFF"
 # idle_text         = "#E6E6E6FF"
 # active_background = "#5865F2FF"
 # active_text       = "#FFFFFFFF"
@@ -205,7 +205,7 @@ cancel  = "󰖭"
 | `freeze_glyphs.cancel` | string | `󰖭` (U+F05AD) | cancelボタンのアイコン |
 | `freeze_colors.overlay.background` | string (hex) | `"#00000059"` | 凍結画面上のディムフィル |
 | `freeze_colors.toolbar.background` | string (hex) | `"#141414D9"` | ツールバー背景 |
-| `freeze_colors.button.idle_background` | string (hex) | `"#333333FF"` | モードボタン・非選択時の背景 |
+| `freeze_colors.button.idle_background` | string (hex) | `"#797A7DFF"` | モードボタン・非選択時の背景 |
 | `freeze_colors.button.idle_text` | string (hex) | `"#E6E6E6FF"` | モードボタン・非選択時のテキスト |
 | `freeze_colors.button.active_background` | string (hex) | `"#5865F2FF"` | モードボタン・選択時の背景 |
 | `freeze_colors.button.active_text` | string (hex) | `"#FFFFFFFF"` | モードボタン・選択時のテキスト |
