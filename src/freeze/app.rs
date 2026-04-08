@@ -675,27 +675,18 @@ fn draw_monitor_highlight(
     } else {
         colors.fill_idle
     };
-    frame.fill_rectangle(
-        Point { x, y },
-        iced::Size {
-            width: w,
-            height: h,
-        },
-        to_iced(fill),
-    );
-
     let (stroke, stroke_w) = if hovered {
         (colors.stroke_hovered, 3.0f32)
     } else {
         (colors.stroke_idle, 1.0f32)
     };
-    let path = canvas::Path::rectangle(
-        Point { x, y },
-        iced::Size {
-            width: w,
-            height: h,
-        },
-    );
+    let size = iced::Size {
+        width: w,
+        height: h,
+    };
+    let top_left = Point { x, y };
+    let path = canvas::Path::rectangle(top_left, size);
+    frame.fill(&path, to_iced(fill));
     frame.stroke(
         &path,
         canvas::Stroke::default()
