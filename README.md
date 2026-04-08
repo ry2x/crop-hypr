@@ -149,49 +149,49 @@ all     = "󰁌"
 cancel  = "󰖭"
 
 # ── Freeze mode UI colors ─────────────────────────────────────────────────────
-# All colors are [red, green, blue, alpha] float arrays with values in [0.0, 1.0].
+# All colors are CSS-style hex strings: "#RRGGBBAA" (or "#RRGGBB", "#RGBA", "#RGB").
 # Every key is optional; omitted keys fall back to the built-in defaults shown below.
 
 # [freeze_colors.overlay]
-# background = [0.0, 0.0, 0.0, 0.35]     # dim over frozen screen
+# background = "#00000059"     # dim over frozen screen
 
 # [freeze_colors.toolbar]
-# background = [0.08, 0.08, 0.08, 0.85]  # toolbar pill background
+# background = "#141414D9"  # toolbar pill background
 
 # [freeze_colors.button]
-# idle_background   = [0.20, 0.20, 0.20, 1.0]
-# idle_text         = [0.90, 0.90, 0.90, 1.0]
-# active_background = [0.345, 0.396, 0.949, 1.0]
-# active_text       = [1.0, 1.0, 1.0, 1.0]
-# hover_background  = [0.42, 0.475, 0.961, 1.0]
-# hover_text        = [1.0, 1.0, 1.0, 1.0]
+# idle_background   = "#333333FF"
+# idle_text         = "#E6E6E6FF"
+# active_background = "#5865F2FF"
+# active_text       = "#FFFFFFFF"
+# hover_background  = "#6B79F5FF"
+# hover_text        = "#FFFFFFFF"
 
 # [freeze_colors.cancel_button]
-# idle_background  = [0.765, 0.259, 0.247, 1.0]
-# idle_text        = [1.0, 1.0, 1.0, 1.0]
-# hover_background = [0.831, 0.290, 0.278, 1.0]
-# hover_text       = [1.0, 1.0, 1.0, 1.0]
+# idle_background  = "#C3423FFF"
+# idle_text        = "#FFFFFFFF"
+# hover_background = "#D44A47FF"
+# hover_text       = "#FFFFFFFF"
 
 # [freeze_colors.window_frame]
-# fill_idle      = [0.27, 0.52, 1.0, 0.20]
-# fill_hovered   = [0.27, 0.52, 1.0, 0.55]
-# stroke_idle    = [0.3, 0.6, 1.0, 0.70]
-# stroke_hovered = [0.3, 0.6, 1.0, 1.0]
-# label_text     = [1.0, 1.0, 1.0, 1.0]
-# hint_text      = [0.8, 0.9, 1.0, 0.9]  # "Click to capture"
+# fill_idle      = "#4585FF33"
+# fill_hovered   = "#4585FF8C"
+# stroke_idle    = "#4D99FFB3"
+# stroke_hovered = "#4D99FFFF"
+# label_text     = "#FFFFFFFF"
+# hint_text      = "#CCE6FFE6"  # "Click to capture"
 
 # [freeze_colors.monitor_frame]
-# fill_idle      = [0.27, 0.52, 1.0, 0.08]
-# fill_hovered   = [0.27, 0.52, 1.0, 0.40]
-# stroke_idle    = [0.3, 0.6, 1.0, 0.35]
-# stroke_hovered = [0.3, 0.6, 1.0, 1.0]
-# label_text     = [1.0, 1.0, 1.0, 1.0]
-# hint_text      = [0.8, 0.9, 1.0, 0.9]
-# name_text_idle = [1.0, 1.0, 1.0, 0.5]  # monitor name when not hovered
+# fill_idle      = "#4585FF14"
+# fill_hovered   = "#4585FF66"
+# stroke_idle    = "#4D99FF59"
+# stroke_hovered = "#4D99FFFF"
+# label_text     = "#FFFFFFFF"
+# hint_text      = "#CCE6FFE6"  # "Click to capture"
+# name_text_idle = "#FFFFFF80"  # monitor name when not hovered  # monitor name when not hovered
 
 # [freeze_colors.crop_frame]
-# stroke     = [1.0, 1.0, 1.0, 1.0]
-# label_text = [1.0, 1.0, 1.0, 1.0]      # "W × H" size label
+# stroke     = "#FFFFFFFF"
+# label_text = "#FFFFFFFF"      # "W × H" size label
 ```
 
 ### Config reference
@@ -207,33 +207,33 @@ cancel  = "󰖭"
 | `freeze_glyphs.monitor` | string | `󰍹` (U+F0379) | Toolbar icon for monitor mode |
 | `freeze_glyphs.all` | string | `󰁌` (U+F004C) | Toolbar icon for all-monitors mode |
 | `freeze_glyphs.cancel` | string | `󰖭` (U+F05AD) | Toolbar icon for cancel button |
-| `freeze_colors.overlay.background` | [f32;4] | `[0.0, 0.0, 0.0, 0.35]` | Dim fill over frozen screen |
-| `freeze_colors.toolbar.background` | [f32;4] | `[0.08, 0.08, 0.08, 0.85]` | Toolbar pill background |
-| `freeze_colors.button.idle_background` | [f32;4] | `[0.20, 0.20, 0.20, 1.0]` | Mode button — unselected background |
-| `freeze_colors.button.idle_text` | [f32;4] | `[0.90, 0.90, 0.90, 1.0]` | Mode button — unselected text |
-| `freeze_colors.button.active_background` | [f32;4] | `[0.345, 0.396, 0.949, 1.0]` | Mode button — selected background |
-| `freeze_colors.button.active_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | Mode button — selected text |
-| `freeze_colors.button.hover_background` | [f32;4] | `[0.42, 0.475, 0.961, 1.0]` | Mode button — hover background |
-| `freeze_colors.button.hover_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | Mode button — hover text |
-| `freeze_colors.cancel_button.idle_background` | [f32;4] | `[0.765, 0.259, 0.247, 1.0]` | Cancel button — normal background |
-| `freeze_colors.cancel_button.idle_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | Cancel button — normal text |
-| `freeze_colors.cancel_button.hover_background` | [f32;4] | `[0.831, 0.290, 0.278, 1.0]` | Cancel button — hover background |
-| `freeze_colors.cancel_button.hover_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | Cancel button — hover text |
-| `freeze_colors.window_frame.fill_idle` | [f32;4] | `[0.27, 0.52, 1.0, 0.20]` | Window highlight fill (not hovered) |
-| `freeze_colors.window_frame.fill_hovered` | [f32;4] | `[0.27, 0.52, 1.0, 0.55]` | Window highlight fill (hovered) |
-| `freeze_colors.window_frame.stroke_idle` | [f32;4] | `[0.3, 0.6, 1.0, 0.70]` | Window highlight outline (not hovered) |
-| `freeze_colors.window_frame.stroke_hovered` | [f32;4] | `[0.3, 0.6, 1.0, 1.0]` | Window highlight outline (hovered) |
-| `freeze_colors.window_frame.label_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | Window title text (hovered) |
-| `freeze_colors.window_frame.hint_text` | [f32;4] | `[0.8, 0.9, 1.0, 0.9]` | "Click to capture" hint (hovered) |
-| `freeze_colors.monitor_frame.fill_idle` | [f32;4] | `[0.27, 0.52, 1.0, 0.08]` | Monitor highlight fill (not hovered) |
-| `freeze_colors.monitor_frame.fill_hovered` | [f32;4] | `[0.27, 0.52, 1.0, 0.40]` | Monitor highlight fill (hovered) |
-| `freeze_colors.monitor_frame.stroke_idle` | [f32;4] | `[0.3, 0.6, 1.0, 0.35]` | Monitor highlight outline (not hovered) |
-| `freeze_colors.monitor_frame.stroke_hovered` | [f32;4] | `[0.3, 0.6, 1.0, 1.0]` | Monitor highlight outline (hovered) |
-| `freeze_colors.monitor_frame.label_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | Monitor name text (hovered) |
-| `freeze_colors.monitor_frame.hint_text` | [f32;4] | `[0.8, 0.9, 1.0, 0.9]` | "Click to capture" hint (hovered) |
-| `freeze_colors.monitor_frame.name_text_idle` | [f32;4] | `[1.0, 1.0, 1.0, 0.5]` | Monitor name text (not hovered) |
-| `freeze_colors.crop_frame.stroke` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | Crop rubber-band outline |
-| `freeze_colors.crop_frame.label_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | "W × H" size label in crop mode |
+| `freeze_colors.overlay.background` | string (hex) | `"#00000059"` | Dim fill over frozen screen |
+| `freeze_colors.toolbar.background` | string (hex) | `"#141414D9"` | Toolbar pill background |
+| `freeze_colors.button.idle_background` | string (hex) | `"#333333FF"` | Mode button — unselected background |
+| `freeze_colors.button.idle_text` | string (hex) | `"#E6E6E6FF"` | Mode button — unselected text |
+| `freeze_colors.button.active_background` | string (hex) | `"#5865F2FF"` | Mode button — selected background |
+| `freeze_colors.button.active_text` | string (hex) | `"#FFFFFFFF"` | Mode button — selected text |
+| `freeze_colors.button.hover_background` | string (hex) | `"#6B79F5FF"` | Mode button — hover background |
+| `freeze_colors.button.hover_text` | string (hex) | `"#FFFFFFFF"` | Mode button — hover text |
+| `freeze_colors.cancel_button.idle_background` | string (hex) | `"#C3423FFF"` | Cancel button — normal background |
+| `freeze_colors.cancel_button.idle_text` | string (hex) | `"#FFFFFFFF"` | Cancel button — normal text |
+| `freeze_colors.cancel_button.hover_background` | string (hex) | `"#D44A47FF"` | Cancel button — hover background |
+| `freeze_colors.cancel_button.hover_text` | string (hex) | `"#FFFFFFFF"` | Cancel button — hover text |
+| `freeze_colors.window_frame.fill_idle` | string (hex) | `"#4585FF33"` | Window highlight fill (not hovered) |
+| `freeze_colors.window_frame.fill_hovered` | string (hex) | `"#4585FF8C"` | Window highlight fill (hovered) |
+| `freeze_colors.window_frame.stroke_idle` | string (hex) | `"#4D99FFB3"` | Window highlight outline (not hovered) |
+| `freeze_colors.window_frame.stroke_hovered` | string (hex) | `"#4D99FFFF"` | Window highlight outline (hovered) |
+| `freeze_colors.window_frame.label_text` | string (hex) | `"#FFFFFFFF"` | Window title text (hovered) |
+| `freeze_colors.window_frame.hint_text` | string (hex) | `"#CCE6FFE6"` | "Click to capture" hint (hovered) |
+| `freeze_colors.monitor_frame.fill_idle` | string (hex) | `"#4585FF14"` | Monitor highlight fill (not hovered) |
+| `freeze_colors.monitor_frame.fill_hovered` | string (hex) | `"#4585FF66"` | Monitor highlight fill (hovered) |
+| `freeze_colors.monitor_frame.stroke_idle` | string (hex) | `"#4D99FF59"` | Monitor highlight outline (not hovered) |
+| `freeze_colors.monitor_frame.stroke_hovered` | string (hex) | `"#4D99FFFF"` | Monitor highlight outline (hovered) |
+| `freeze_colors.monitor_frame.label_text` | string (hex) | `"#FFFFFFFF"` | Monitor name text (hovered) |
+| `freeze_colors.monitor_frame.hint_text` | string (hex) | `"#CCE6FFE6"` | "Click to capture" hint (hovered) |
+| `freeze_colors.monitor_frame.name_text_idle` | string (hex) | `"#FFFFFF80"` | Monitor name text (not hovered) |
+| `freeze_colors.crop_frame.stroke` | string (hex) | `"#FFFFFFFF"` | Crop rubber-band outline |
+| `freeze_colors.crop_frame.label_text` | string (hex) | `"#FFFFFFFF"` | "W × H" size label in crop mode |
 
 ## License
 

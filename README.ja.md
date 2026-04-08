@@ -149,45 +149,45 @@ cancel  = "󰖭"
 # すべてのキーは省略可能で、省略した場合は以下の既定値が使用されます。
 
 # [freeze_colors.overlay]
-# background = [0.0, 0.0, 0.0, 0.35]     # 凍結画面上のディム
+# background = "#00000059"     # 凍結画面上のディム
 
 # [freeze_colors.toolbar]
-# background = [0.08, 0.08, 0.08, 0.85]  # ツールバーの背景
+# background = "#141414D9"  # ツールバーの背景
 
 # [freeze_colors.button]
-# idle_background   = [0.20, 0.20, 0.20, 1.0]
-# idle_text         = [0.90, 0.90, 0.90, 1.0]
-# active_background = [0.345, 0.396, 0.949, 1.0]
-# active_text       = [1.0, 1.0, 1.0, 1.0]
-# hover_background  = [0.42, 0.475, 0.961, 1.0]
-# hover_text        = [1.0, 1.0, 1.0, 1.0]
+# idle_background   = "#333333FF"
+# idle_text         = "#E6E6E6FF"
+# active_background = "#5865F2FF"
+# active_text       = "#FFFFFFFF"
+# hover_background  = "#6B79F5FF"
+# hover_text        = "#FFFFFFFF"
 
 # [freeze_colors.cancel_button]
-# idle_background  = [0.765, 0.259, 0.247, 1.0]
-# idle_text        = [1.0, 1.0, 1.0, 1.0]
-# hover_background = [0.831, 0.290, 0.278, 1.0]
-# hover_text       = [1.0, 1.0, 1.0, 1.0]
+# idle_background  = "#C3423FFF"
+# idle_text        = "#FFFFFFFF"
+# hover_background = "#D44A47FF"
+# hover_text       = "#FFFFFFFF"
 
 # [freeze_colors.window_frame]
-# fill_idle      = [0.27, 0.52, 1.0, 0.20]
-# fill_hovered   = [0.27, 0.52, 1.0, 0.55]
-# stroke_idle    = [0.3, 0.6, 1.0, 0.70]
-# stroke_hovered = [0.3, 0.6, 1.0, 1.0]
-# label_text     = [1.0, 1.0, 1.0, 1.0]
-# hint_text      = [0.8, 0.9, 1.0, 0.9]  # "Click to capture"
+# fill_idle      = "#4585FF33"
+# fill_hovered   = "#4585FF8C"
+# stroke_idle    = "#4D99FFB3"
+# stroke_hovered = "#4D99FFFF"
+# label_text     = "#FFFFFFFF"
+# hint_text      = "#CCE6FFE6"  # "Click to capture"
 
 # [freeze_colors.monitor_frame]
-# fill_idle      = [0.27, 0.52, 1.0, 0.08]
-# fill_hovered   = [0.27, 0.52, 1.0, 0.40]
-# stroke_idle    = [0.3, 0.6, 1.0, 0.35]
-# stroke_hovered = [0.3, 0.6, 1.0, 1.0]
-# label_text     = [1.0, 1.0, 1.0, 1.0]
-# hint_text      = [0.8, 0.9, 1.0, 0.9]
-# name_text_idle = [1.0, 1.0, 1.0, 0.5]  # ホバーしていないときのモニター名
+# fill_idle      = "#4585FF14"
+# fill_hovered   = "#4585FF66"
+# stroke_idle    = "#4D99FF59"
+# stroke_hovered = "#4D99FFFF"
+# label_text     = "#FFFFFFFF"
+# hint_text      = "#CCE6FFE6"  # "Click to capture"
+# name_text_idle = "#FFFFFF80"  # ホバーしていないときのモニター名  # ホバーしていないときのモニター名
 
 # [freeze_colors.crop_frame]
-# stroke     = [1.0, 1.0, 1.0, 1.0]
-# label_text = [1.0, 1.0, 1.0, 1.0]      # "W × H" サイズラベル
+# stroke     = "#FFFFFFFF"
+# label_text = "#FFFFFFFF"      # "W × H" サイズラベル
 ```
 
 ### 設定項目リファレンス
@@ -203,33 +203,33 @@ cancel  = "󰖭"
 | `freeze_glyphs.monitor` | string | `󰍹` (U+F0379) | monitorモードのアイコン |
 | `freeze_glyphs.all` | string | `󰁌` (U+F004C) | allモードのアイコン |
 | `freeze_glyphs.cancel` | string | `󰖭` (U+F05AD) | cancelボタンのアイコン |
-| `freeze_colors.overlay.background` | [f32;4] | `[0.0, 0.0, 0.0, 0.35]` | 凍結画面上のディムフィル |
-| `freeze_colors.toolbar.background` | [f32;4] | `[0.08, 0.08, 0.08, 0.85]` | ツールバー背景 |
-| `freeze_colors.button.idle_background` | [f32;4] | `[0.20, 0.20, 0.20, 1.0]` | モードボタン・非選択時の背景 |
-| `freeze_colors.button.idle_text` | [f32;4] | `[0.90, 0.90, 0.90, 1.0]` | モードボタン・非選択時のテキスト |
-| `freeze_colors.button.active_background` | [f32;4] | `[0.345, 0.396, 0.949, 1.0]` | モードボタン・選択時の背景 |
-| `freeze_colors.button.active_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | モードボタン・選択時のテキスト |
-| `freeze_colors.button.hover_background` | [f32;4] | `[0.42, 0.475, 0.961, 1.0]` | モードボタン・ホバー時の背景 |
-| `freeze_colors.button.hover_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | モードボタン・ホバー時のテキスト |
-| `freeze_colors.cancel_button.idle_background` | [f32;4] | `[0.765, 0.259, 0.247, 1.0]` | キャンセルボタン・通常背景 |
-| `freeze_colors.cancel_button.idle_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | キャンセルボタン・通常テキスト |
-| `freeze_colors.cancel_button.hover_background` | [f32;4] | `[0.831, 0.290, 0.278, 1.0]` | キャンセルボタン・ホバー背景 |
-| `freeze_colors.cancel_button.hover_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | キャンセルボタン・ホバーテキスト |
-| `freeze_colors.window_frame.fill_idle` | [f32;4] | `[0.27, 0.52, 1.0, 0.20]` | ウィンドウ枠フィル（非ホバー） |
-| `freeze_colors.window_frame.fill_hovered` | [f32;4] | `[0.27, 0.52, 1.0, 0.55]` | ウィンドウ枠フィル（ホバー） |
-| `freeze_colors.window_frame.stroke_idle` | [f32;4] | `[0.3, 0.6, 1.0, 0.70]` | ウィンドウ枠ストローク（非ホバー） |
-| `freeze_colors.window_frame.stroke_hovered` | [f32;4] | `[0.3, 0.6, 1.0, 1.0]` | ウィンドウ枠ストローク（ホバー） |
-| `freeze_colors.window_frame.label_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | ウィンドウタイトルテキスト（ホバー時） |
-| `freeze_colors.window_frame.hint_text` | [f32;4] | `[0.8, 0.9, 1.0, 0.9]` | "Click to capture" ヒント（ホバー時） |
-| `freeze_colors.monitor_frame.fill_idle` | [f32;4] | `[0.27, 0.52, 1.0, 0.08]` | モニター枠フィル（非ホバー） |
-| `freeze_colors.monitor_frame.fill_hovered` | [f32;4] | `[0.27, 0.52, 1.0, 0.40]` | モニター枠フィル（ホバー） |
-| `freeze_colors.monitor_frame.stroke_idle` | [f32;4] | `[0.3, 0.6, 1.0, 0.35]` | モニター枠ストローク（非ホバー） |
-| `freeze_colors.monitor_frame.stroke_hovered` | [f32;4] | `[0.3, 0.6, 1.0, 1.0]` | モニター枠ストローク（ホバー） |
-| `freeze_colors.monitor_frame.label_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | モニター名テキスト（ホバー時） |
-| `freeze_colors.monitor_frame.hint_text` | [f32;4] | `[0.8, 0.9, 1.0, 0.9]` | "Click to capture" ヒント（ホバー時） |
-| `freeze_colors.monitor_frame.name_text_idle` | [f32;4] | `[1.0, 1.0, 1.0, 0.5]` | モニター名テキスト（非ホバー時） |
-| `freeze_colors.crop_frame.stroke` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | クロップ選択枠のストローク |
-| `freeze_colors.crop_frame.label_text` | [f32;4] | `[1.0, 1.0, 1.0, 1.0]` | クロップモードの "W × H" サイズラベル |
+| `freeze_colors.overlay.background` | string (hex) | `"#00000059"` | 凍結画面上のディムフィル |
+| `freeze_colors.toolbar.background` | string (hex) | `"#141414D9"` | ツールバー背景 |
+| `freeze_colors.button.idle_background` | string (hex) | `"#333333FF"` | モードボタン・非選択時の背景 |
+| `freeze_colors.button.idle_text` | string (hex) | `"#E6E6E6FF"` | モードボタン・非選択時のテキスト |
+| `freeze_colors.button.active_background` | string (hex) | `"#5865F2FF"` | モードボタン・選択時の背景 |
+| `freeze_colors.button.active_text` | string (hex) | `"#FFFFFFFF"` | モードボタン・選択時のテキスト |
+| `freeze_colors.button.hover_background` | string (hex) | `"#6B79F5FF"` | モードボタン・ホバー時の背景 |
+| `freeze_colors.button.hover_text` | string (hex) | `"#FFFFFFFF"` | モードボタン・ホバー時のテキスト |
+| `freeze_colors.cancel_button.idle_background` | string (hex) | `"#C3423FFF"` | キャンセルボタン・通常背景 |
+| `freeze_colors.cancel_button.idle_text` | string (hex) | `"#FFFFFFFF"` | キャンセルボタン・通常テキスト |
+| `freeze_colors.cancel_button.hover_background` | string (hex) | `"#D44A47FF"` | キャンセルボタン・ホバー背景 |
+| `freeze_colors.cancel_button.hover_text` | string (hex) | `"#FFFFFFFF"` | キャンセルボタン・ホバーテキスト |
+| `freeze_colors.window_frame.fill_idle` | string (hex) | `"#4585FF33"` | ウィンドウ枠フィル（非ホバー） |
+| `freeze_colors.window_frame.fill_hovered` | string (hex) | `"#4585FF8C"` | ウィンドウ枠フィル（ホバー） |
+| `freeze_colors.window_frame.stroke_idle` | string (hex) | `"#4D99FFB3"` | ウィンドウ枠ストローク（非ホバー） |
+| `freeze_colors.window_frame.stroke_hovered` | string (hex) | `"#4D99FFFF"` | ウィンドウ枠ストローク（ホバー） |
+| `freeze_colors.window_frame.label_text` | string (hex) | `"#FFFFFFFF"` | ウィンドウタイトルテキスト（ホバー時） |
+| `freeze_colors.window_frame.hint_text` | string (hex) | `"#CCE6FFE6"` | "Click to capture" ヒント（ホバー時） |
+| `freeze_colors.monitor_frame.fill_idle` | string (hex) | `"#4585FF14"` | モニター枠フィル（非ホバー） |
+| `freeze_colors.monitor_frame.fill_hovered` | string (hex) | `"#4585FF66"` | モニター枠フィル（ホバー） |
+| `freeze_colors.monitor_frame.stroke_idle` | string (hex) | `"#4D99FF59"` | モニター枠ストローク（非ホバー） |
+| `freeze_colors.monitor_frame.stroke_hovered` | string (hex) | `"#4D99FFFF"` | モニター枠ストローク（ホバー） |
+| `freeze_colors.monitor_frame.label_text` | string (hex) | `"#FFFFFFFF"` | モニター名テキスト（ホバー時） |
+| `freeze_colors.monitor_frame.hint_text` | string (hex) | `"#CCE6FFE6"` | "Click to capture" ヒント（ホバー時） |
+| `freeze_colors.monitor_frame.name_text_idle` | string (hex) | `"#FFFFFF80"` | モニター名テキスト（非ホバー時） |
+| `freeze_colors.crop_frame.stroke` | string (hex) | `"#FFFFFFFF"` | クロップ選択枠のストローク |
+| `freeze_colors.crop_frame.label_text` | string (hex) | `"#FFFFFFFF"` | クロップモードの "W × H" サイズラベル |
 
 ## ライセンス
 
