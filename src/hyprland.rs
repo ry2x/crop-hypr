@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
@@ -154,6 +155,55 @@ pub fn get_monitors() -> Result<Vec<HyprMonitor>> {
 
 pub fn get_clients() -> Result<Vec<HyprClient>> {
     hyprland_ipc("clients")
+}
+
+// ── Layer-shell surface types ─────────────────────────────────────────────────
+
+#[derive(Deserialize, Debug)]
+struct HyprLayerSurface {
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    namespace: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct HyprLayerMonitor {
+    levels: HashMap<String, Vec<HyprLayerSurface>>,
+}
+
+/// A Wayland layer-shell surface at overlay level (level 3).
+#[derive(Debug, Clone)]
+pub struct LayerSurface {
+    pub rect: ScreenRect,
+    pub namespace: String,
+}
+
+/// Fetch all overlay-level (level 3) layer surfaces from Hyprland IPC.
+pub fn get_overlay_layers() -> Result<Vec<LayerSurface>> {
+    let monitors: HashMap<String, HyprLayerMonitor> = hyprland_ipc("layers")?;
+    let surfaces = monitors
+        .into_values()
+        .flat_map(|mon| {
+            mon.levels
+                .into_iter()
+                .filter(|(level, _)| level == "3")
+                .flat_map(|(_, surfaces)| surfaces)
+                .map(|s| LayerSurface {
+                    rect: ScreenRect {
+                        x: s.x,
+                        y: s.y,
+                        w: s.w,
+                        h: s.h,
+                    },
+                    namespace: s.namespace,
+                })
+                .collect::<Vec<_>>()
+        })
+        .filter(|s| s.rect.w > 0 && s.rect.h > 0)
+        .collect();
+    Ok(surfaces)
 }
 
 pub fn parse_monitors(monitors: Vec<HyprMonitor>) -> Vec<MonitorInfo> {

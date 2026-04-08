@@ -20,7 +20,7 @@ use crate::config::{
     WindowFrameColors,
 };
 use crate::freeze_state;
-use crate::hyprland::{BorderStyle, MonitorInfo, ScreenRect, WindowInfo};
+use crate::hyprland::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
 
@@ -46,11 +46,20 @@ pub enum CaptureMode {
     All,
 }
 
+// ── Hovered target (Window mode distinguishes windows from layer surfaces) ────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoveredTarget {
+    Window(usize),
+    Layer(usize),
+}
+
 // ── Canvas program (owns its data, no lifetime on AppState) ───────────────────
 
 pub struct SelectionCanvas {
     pub mode: CaptureMode,
     pub windows: Arc<Vec<WindowInfo>>,
+    pub layers: Arc<Vec<LayerSurface>>,
     pub monitors: Arc<Vec<MonitorInfo>>,
     /// Global pixel origin of the monitor this overlay window is on.
     /// Canvas coordinates are local (0,0 = top-left of this monitor).
@@ -68,7 +77,7 @@ pub struct SelectionCanvas {
 pub struct CanvasState {
     phase: DrawPhase,
     cursor: Point,
-    hovered: Option<usize>,
+    hovered: Option<HoveredTarget>,
 }
 
 #[derive(Default)]
@@ -104,14 +113,23 @@ impl canvas::Program<Message> for SelectionCanvas {
                     DrawPhase::Idle => {
                         let prev = state.hovered;
                         state.hovered = match self.mode {
-                            CaptureMode::Window => hit_index(
-                                &self.windows,
-                                pos,
-                                self.monitor_offset,
-                                self.border_style.border_size,
-                            ),
+                            CaptureMode::Window => {
+                                // Layers are at overlay level — check them first
+                                hit_index_layer(&self.layers, pos, self.monitor_offset)
+                                    .map(HoveredTarget::Layer)
+                                    .or_else(|| {
+                                        hit_index(
+                                            &self.windows,
+                                            pos,
+                                            self.monitor_offset,
+                                            self.border_style.border_size,
+                                        )
+                                        .map(HoveredTarget::Window)
+                                    })
+                            }
                             CaptureMode::Monitor => {
                                 hit_index_m(&self.monitors, pos, self.monitor_offset)
+                                    .map(HoveredTarget::Window)
                             }
                             _ => None,
                         };
@@ -137,17 +155,25 @@ impl canvas::Program<Message> for SelectionCanvas {
                             return Some(canvas::Action::request_redraw().and_capture());
                         }
                     }
-                    CaptureMode::Window => {
-                        if let Some(idx) = state.hovered {
+                    CaptureMode::Window => match state.hovered {
+                        Some(HoveredTarget::Layer(idx)) => {
+                            let rect = self.layers[idx].rect;
+                            return Some(
+                                canvas::Action::publish(Message::SelectionConfirmed(rect))
+                                    .and_capture(),
+                            );
+                        }
+                        Some(HoveredTarget::Window(idx)) => {
                             let rect = self.windows[idx].rect.expand(self.border_style.border_size);
                             return Some(
                                 canvas::Action::publish(Message::SelectionConfirmed(rect))
                                     .and_capture(),
                             );
                         }
-                    }
+                        None => {}
+                    },
                     CaptureMode::Monitor => {
-                        if let Some(idx) = state.hovered {
+                        if let Some(HoveredTarget::Window(idx)) = state.hovered {
                             let rect = self.monitors[idx].rect;
                             return Some(
                                 canvas::Action::publish(Message::SelectionConfirmed(rect))
@@ -212,10 +238,22 @@ impl canvas::Program<Message> for SelectionCanvas {
                     draw_highlight(
                         &mut frame,
                         win.rect,
-                        state.hovered == Some(i),
+                        state.hovered == Some(HoveredTarget::Window(i)),
                         &win.title,
                         self.monitor_offset,
                         self.border_style,
+                        &self.colors.window_frame,
+                    );
+                }
+                // Layer surfaces are at overlay level — draw on top of windows
+                for (i, layer) in self.layers.iter().enumerate() {
+                    draw_highlight(
+                        &mut frame,
+                        layer.rect,
+                        state.hovered == Some(HoveredTarget::Layer(i)),
+                        &layer.namespace,
+                        self.monitor_offset,
+                        BorderStyle::default(),
                         &self.colors.window_frame,
                     );
                 }
@@ -225,7 +263,7 @@ impl canvas::Program<Message> for SelectionCanvas {
                     draw_monitor_highlight(
                         &mut frame,
                         mon.rect,
-                        state.hovered == Some(i),
+                        state.hovered == Some(HoveredTarget::Window(i)),
                         &mon.name,
                         self.monitor_offset,
                         &self.colors.monitor_frame,
@@ -264,6 +302,7 @@ pub struct AppStateConfig {
     pub focused_monitor_idx: usize,
     pub window_to_monitor: HashMap<iced::window::Id, usize>,
     pub windows: Arc<Vec<WindowInfo>>,
+    pub layers: Arc<Vec<LayerSurface>>,
     pub monitors: Arc<Vec<MonitorInfo>>,
     pub result: Arc<Mutex<Option<Option<ScreenRect>>>>,
     pub glyphs: FreezeGlyphs,
@@ -282,6 +321,7 @@ pub struct AppState {
     /// Maps extra window IDs (spawned at boot) → monitor index
     pub window_to_monitor: HashMap<iced::window::Id, usize>,
     pub windows: Arc<Vec<WindowInfo>>,
+    pub layers: Arc<Vec<LayerSurface>>,
     pub monitors: Arc<Vec<MonitorInfo>>,
     /// None        = cancelled (ESC, never set)
     /// Some(None)  = "All" selected (use full screenshot)
@@ -305,6 +345,7 @@ impl AppState {
             focused_monitor_idx: cfg.focused_monitor_idx,
             window_to_monitor: cfg.window_to_monitor,
             windows: cfg.windows,
+            layers: cfg.layers,
             monitors: cfg.monitors,
             result: cfg.result,
             repaint_ticks: 6,
@@ -363,6 +404,7 @@ impl AppState {
         let canvas_prog = SelectionCanvas {
             mode: self.mode,
             windows: Arc::clone(&self.windows),
+            layers: Arc::clone(&self.layers),
             monitors: Arc::clone(&self.monitors),
             monitor_offset,
             border_style: self.border_style,
@@ -774,6 +816,16 @@ fn hit_index_m(monitors: &[MonitorInfo], pos: Option<Point>, offset: Point) -> O
     let gy = p.y + offset.y;
     monitors.iter().position(|m| {
         let r = m.rect;
+        gx >= r.x as f32 && gx <= (r.x + r.w) as f32 && gy >= r.y as f32 && gy <= (r.y + r.h) as f32
+    })
+}
+
+fn hit_index_layer(layers: &[LayerSurface], pos: Option<Point>, offset: Point) -> Option<usize> {
+    let p = pos?;
+    let gx = p.x + offset.x;
+    let gy = p.y + offset.y;
+    layers.iter().position(|l| {
+        let r = l.rect;
         gx >= r.x as f32 && gx <= (r.x + r.w) as f32 && gy >= r.y as f32 && gy <= (r.y + r.h) as f32
     })
 }
