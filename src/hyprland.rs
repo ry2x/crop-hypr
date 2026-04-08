@@ -13,6 +13,19 @@ pub struct ScreenRect {
     pub h: i32,
 }
 
+impl ScreenRect {
+    /// Expand the rect outward by `border_size` on every side (in logical pixels).
+    pub fn expand(self, border_size: u32) -> Self {
+        let b = border_size as i32;
+        Self {
+            x: self.x - b,
+            y: self.y - b,
+            w: self.w + 2 * b,
+            h: self.h + 2 * b,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct WindowInfo {
     pub rect: ScreenRect,

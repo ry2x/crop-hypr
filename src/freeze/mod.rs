@@ -2,7 +2,7 @@ mod app;
 
 pub use app::CaptureMode;
 
-use app::{AppState, Message, app_subscription, app_update, app_view};
+use app::{AppState, AppStateConfig, Message, app_subscription, app_update, app_view};
 use iced::Task;
 use iced::widget::image as iced_image;
 use iced_layershell::{
@@ -109,18 +109,18 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     })
                     .collect();
 
-                let state = AppState::new(
-                    monitor_images.clone(),
+                let state = AppState::new(AppStateConfig {
+                    monitor_images: monitor_images.clone(),
                     focused_monitor_idx,
-                    window_to_monitor.clone(),
-                    Arc::clone(&wins),
-                    Arc::clone(&mons),
-                    result_clone.clone(),
-                    glyphs.clone(),
+                    window_to_monitor: window_to_monitor.clone(),
+                    windows: Arc::clone(&wins),
+                    monitors: Arc::clone(&mons),
+                    result: result_clone.clone(),
+                    glyphs: glyphs.clone(),
                     toolbar_position,
                     border_style,
                     initial_mode,
-                );
+                });
                 (state, Task::batch(spawn_tasks))
             },
             "crop-hypr-freeze",

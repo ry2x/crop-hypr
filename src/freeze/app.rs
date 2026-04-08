@@ -134,8 +134,7 @@ impl canvas::Program<Message> for SelectionCanvas {
                     }
                     CaptureMode::Window => {
                         if let Some(idx) = state.hovered {
-                            let rect =
-                                expand_rect(self.windows[idx].rect, self.border_style.border_size);
+                            let rect = self.windows[idx].rect.expand(self.border_style.border_size);
                             return Some(
                                 canvas::Action::publish(Message::SelectionConfirmed(rect))
                                     .and_capture(),
@@ -252,6 +251,20 @@ impl canvas::Program<Message> for SelectionCanvas {
 
 // ── App State ─────────────────────────────────────────────────────────────────
 
+/// All construction data for [`AppState`], grouped to avoid a long argument list.
+pub struct AppStateConfig {
+    pub monitor_images: Vec<image::Handle>,
+    pub focused_monitor_idx: usize,
+    pub window_to_monitor: HashMap<iced::window::Id, usize>,
+    pub windows: Arc<Vec<WindowInfo>>,
+    pub monitors: Arc<Vec<MonitorInfo>>,
+    pub result: Arc<Mutex<Option<Option<ScreenRect>>>>,
+    pub glyphs: FreezeGlyphs,
+    pub toolbar_position: ToolbarPosition,
+    pub border_style: BorderStyle,
+    pub initial_mode: CaptureMode,
+}
+
 pub struct AppState {
     pub mode: CaptureMode,
     /// One pre-decoded image handle per monitor (indexed same as `monitors`)
@@ -276,31 +289,19 @@ pub struct AppState {
 }
 
 impl AppState {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        monitor_images: Vec<image::Handle>,
-        focused_monitor_idx: usize,
-        window_to_monitor: HashMap<iced::window::Id, usize>,
-        windows: Arc<Vec<WindowInfo>>,
-        monitors: Arc<Vec<MonitorInfo>>,
-        result: Arc<Mutex<Option<Option<ScreenRect>>>>,
-        glyphs: FreezeGlyphs,
-        toolbar_position: ToolbarPosition,
-        border_style: BorderStyle,
-        initial_mode: CaptureMode,
-    ) -> Self {
+    pub fn new(cfg: AppStateConfig) -> Self {
         Self {
-            mode: initial_mode,
-            monitor_images,
-            focused_monitor_idx,
-            window_to_monitor,
-            windows,
-            monitors,
-            result,
+            mode: cfg.initial_mode,
+            monitor_images: cfg.monitor_images,
+            focused_monitor_idx: cfg.focused_monitor_idx,
+            window_to_monitor: cfg.window_to_monitor,
+            windows: cfg.windows,
+            monitors: cfg.monitors,
+            result: cfg.result,
             repaint_ticks: 6,
-            glyphs,
-            toolbar_position,
-            border_style,
+            glyphs: cfg.glyphs,
+            toolbar_position: cfg.toolbar_position,
+            border_style: cfg.border_style,
         }
     }
 
@@ -541,7 +542,7 @@ fn draw_highlight(
         (0.20, 0.7, 1.0)
     };
 
-    let expanded = expand_rect(rect, border_style.border_size);
+    let expanded = rect.expand(border_style.border_size);
     // Convert global → canvas-local by subtracting monitor origin
     let x = expanded.x as f32 - offset.x;
     let y = expanded.y as f32 - offset.y;
@@ -685,17 +686,6 @@ fn points_to_rect(a: Point, b: Point) -> ScreenRect {
     }
 }
 
-/// Expand a rect outward by `border_size` on every side (in logical pixels).
-fn expand_rect(rect: ScreenRect, border_size: u32) -> ScreenRect {
-    let b = border_size as i32;
-    ScreenRect {
-        x: rect.x - b,
-        y: rect.y - b,
-        w: rect.w + 2 * b,
-        h: rect.h + 2 * b,
-    }
-}
-
 fn hit_index(
     windows: &[WindowInfo],
     pos: Option<Point>,
@@ -713,7 +703,7 @@ fn hit_index(
         .iter()
         .enumerate()
         .filter(|(_, w)| {
-            let r = expand_rect(w.rect, border_size);
+            let r = w.rect.expand(border_size);
             gx >= r.x as f32
                 && gx <= (r.x + r.w) as f32
                 && gy >= r.y as f32

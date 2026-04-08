@@ -22,6 +22,7 @@ fn str_to_mode(s: &str) -> Option<CaptureMode> {
         "crop" => Some(CaptureMode::Crop),
         "window" => Some(CaptureMode::Window),
         "monitor" => Some(CaptureMode::Monitor),
+        "all" => None,
         _ => None,
     }
 }
