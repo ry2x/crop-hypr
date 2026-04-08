@@ -103,6 +103,34 @@ pub fn hyprland_ipc<T: for<'de> Deserialize<'de>>(cmd: &str) -> Result<T> {
     Ok(parsed)
 }
 
+#[derive(Deserialize, Debug)]
+pub struct HyprOption {
+    pub int: i64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BorderStyle {
+    /// Hyprland `general:border_size` in logical pixels.
+    pub border_size: u32,
+    /// Hyprland `decoration:rounding` in logical pixels.
+    pub rounding: u32,
+}
+
+/// Fetch `general:border_size` and `decoration:rounding` from Hyprland IPC.
+/// Falls back to `BorderStyle::default()` on any error.
+pub fn get_border_style() -> BorderStyle {
+    let bs = hyprland_ipc::<HyprOption>("getoption general:border_size")
+        .map(|o| o.int.max(0) as u32)
+        .unwrap_or(0);
+    let rd = hyprland_ipc::<HyprOption>("getoption decoration:rounding")
+        .map(|o| o.int.max(0) as u32)
+        .unwrap_or(0);
+    BorderStyle {
+        border_size: bs,
+        rounding: rd,
+    }
+}
+
 pub fn get_active_window() -> Result<HyprActiveWindow> {
     hyprland_ipc("activewindow")
 }

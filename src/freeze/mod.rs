@@ -21,6 +21,11 @@ use crate::screencopy;
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
     let clients_t = std::thread::spawn(hyprland::get_clients);
+    let border_style = if cfg.capture_window_border {
+        hyprland::get_border_style()
+    } else {
+        hyprland::BorderStyle::default()
+    };
 
     let monitors_raw = monitors_t.join().expect("monitors thread panicked")?;
     let clients_raw = clients_t.join().expect("clients thread panicked")?;
@@ -109,6 +114,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     result_clone.clone(),
                     glyphs.clone(),
                     toolbar_position,
+                    border_style,
                 );
                 (state, Task::batch(spawn_tasks))
             },

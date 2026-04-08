@@ -16,7 +16,7 @@ use iced::{
 };
 
 use crate::config::{FreezeGlyphs, ToolbarPosition};
-use crate::hyprland::{MonitorInfo, ScreenRect, WindowInfo};
+use crate::hyprland::{BorderStyle, MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +52,9 @@ pub struct SelectionCanvas {
     /// Canvas coordinates are local (0,0 = top-left of this monitor).
     /// `canvas_local = global - offset`
     pub monitor_offset: Point,
+    /// Hyprland border style (size + rounding). Applied when drawing and
+    /// confirming window-mode selections.
+    pub border_style: BorderStyle,
 }
 
 // Canvas-internal mutable state
@@ -95,9 +98,12 @@ impl canvas::Program<Message> for SelectionCanvas {
                     DrawPhase::Idle => {
                         let prev = state.hovered;
                         state.hovered = match self.mode {
-                            CaptureMode::Window => {
-                                hit_index(&self.windows, pos, self.monitor_offset)
-                            }
+                            CaptureMode::Window => hit_index(
+                                &self.windows,
+                                pos,
+                                self.monitor_offset,
+                                self.border_style.border_size,
+                            ),
                             CaptureMode::Monitor => {
                                 hit_index_m(&self.monitors, pos, self.monitor_offset)
                             }
@@ -127,7 +133,8 @@ impl canvas::Program<Message> for SelectionCanvas {
                     }
                     CaptureMode::Window => {
                         if let Some(idx) = state.hovered {
-                            let rect = self.windows[idx].rect;
+                            let rect =
+                                expand_rect(self.windows[idx].rect, self.border_style.border_size);
                             return Some(
                                 canvas::Action::publish(Message::SelectionConfirmed(rect))
                                     .and_capture(),
@@ -203,6 +210,7 @@ impl canvas::Program<Message> for SelectionCanvas {
                         state.hovered == Some(i),
                         &win.title,
                         self.monitor_offset,
+                        self.border_style,
                     );
                 }
             }
@@ -263,9 +271,11 @@ pub struct AppState {
     repaint_ticks: u8,
     glyphs: FreezeGlyphs,
     toolbar_position: ToolbarPosition,
+    border_style: BorderStyle,
 }
 
 impl AppState {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         monitor_images: Vec<image::Handle>,
         focused_monitor_idx: usize,
@@ -275,6 +285,7 @@ impl AppState {
         result: Arc<Mutex<Option<Option<ScreenRect>>>>,
         glyphs: FreezeGlyphs,
         toolbar_position: ToolbarPosition,
+        border_style: BorderStyle,
     ) -> Self {
         Self {
             mode: CaptureMode::Crop,
@@ -287,6 +298,7 @@ impl AppState {
             repaint_ticks: 6,
             glyphs,
             toolbar_position,
+            border_style,
         }
     }
 
@@ -339,6 +351,7 @@ impl AppState {
             windows: Arc::clone(&self.windows),
             monitors: Arc::clone(&self.monitors),
             monitor_offset,
+            border_style: self.border_style,
         };
 
         let toolbar = self.toolbar();
@@ -517,34 +530,35 @@ fn draw_highlight(
     hovered: bool,
     label: &str,
     offset: Point,
+    border_style: BorderStyle,
 ) {
     let (fill_a, stroke_a, stroke_w) = if hovered {
         (0.55f32, 1.0f32, 2.0f32)
     } else {
         (0.20, 0.7, 1.0)
     };
+
+    let expanded = expand_rect(rect, border_style.border_size);
     // Convert global → canvas-local by subtracting monitor origin
-    let x = rect.x as f32 - offset.x;
-    let y = rect.y as f32 - offset.y;
-    let w = rect.w as f32;
-    let h = rect.h as f32;
+    let x = expanded.x as f32 - offset.x;
+    let y = expanded.y as f32 - offset.y;
+    let w = expanded.w as f32;
+    let h = expanded.h as f32;
 
-    frame.fill_rectangle(
-        Point { x, y },
-        iced::Size {
-            width: w,
-            height: h,
-        },
-        iced::Color::from_rgba(0.27, 0.52, 1.0, fill_a),
-    );
+    let size = iced::Size {
+        width: w,
+        height: h,
+    };
+    let top_left = Point { x, y };
+    let radius = iced::border::Radius::from(border_style.rounding as f32);
 
-    let path = canvas::Path::rectangle(
-        Point { x, y },
-        iced::Size {
-            width: w,
-            height: h,
-        },
-    );
+    let path = if border_style.rounding > 0 {
+        canvas::Path::rounded_rectangle(top_left, size, radius)
+    } else {
+        canvas::Path::rectangle(top_left, size)
+    };
+
+    frame.fill(&path, iced::Color::from_rgba(0.27, 0.52, 1.0, fill_a));
     frame.stroke(
         &path,
         canvas::Stroke::default()
@@ -668,7 +682,23 @@ fn points_to_rect(a: Point, b: Point) -> ScreenRect {
     }
 }
 
-fn hit_index(windows: &[WindowInfo], pos: Option<Point>, offset: Point) -> Option<usize> {
+/// Expand a rect outward by `border_size` on every side (in logical pixels).
+fn expand_rect(rect: ScreenRect, border_size: u32) -> ScreenRect {
+    let b = border_size as i32;
+    ScreenRect {
+        x: rect.x - b,
+        y: rect.y - b,
+        w: rect.w + 2 * b,
+        h: rect.h + 2 * b,
+    }
+}
+
+fn hit_index(
+    windows: &[WindowInfo],
+    pos: Option<Point>,
+    offset: Point,
+    border_size: u32,
+) -> Option<usize> {
     let p = pos?;
     // Convert canvas-local cursor to global for comparison with hyprctl rects
     let gx = p.x + offset.x;
@@ -680,7 +710,7 @@ fn hit_index(windows: &[WindowInfo], pos: Option<Point>, offset: Point) -> Optio
         .iter()
         .enumerate()
         .filter(|(_, w)| {
-            let r = w.rect;
+            let r = expand_rect(w.rect, border_size);
             gx >= r.x as f32
                 && gx <= (r.x + r.w) as f32
                 && gy >= r.y as f32
