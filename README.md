@@ -237,4 +237,4 @@ cancel  = "󰖭"
 
 ## License
 
-MIT
+[MIT](./LICENSE)
