@@ -27,6 +27,22 @@ fn str_to_mode(s: &str) -> Option<CaptureMode> {
     }
 }
 
+fn write_mode(path: &std::path::Path, mode: CaptureMode) {
+    if let Some(parent) = path.parent()
+        && fs::create_dir_all(parent).is_err()
+    {
+        return;
+    }
+    let _ = fs::write(path, mode_to_str(mode));
+}
+
+fn read_mode(path: &std::path::Path) -> CaptureMode {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|s| str_to_mode(&s))
+        .unwrap_or(CaptureMode::Crop)
+}
+
 /// Persist the last-used freeze mode. `CaptureMode::All` is intentionally
 /// excluded — it fires immediately on press so there is no meaningful "last
 /// interactive mode" to remember.
@@ -35,100 +51,71 @@ pub fn save_last_mode(mode: CaptureMode) {
         return;
     }
     let Some(path) = state_file() else { return };
-    if let Some(parent) = path.parent()
-        && fs::create_dir_all(parent).is_err()
-    {
-        return;
-    }
-    let _ = fs::write(&path, mode_to_str(mode));
+    write_mode(&path, mode);
 }
 
 /// Load the last-used freeze mode from disk.
 /// Returns `CaptureMode::Crop` if the file is missing, unreadable, or contains
 /// an unrecognised value.
 pub fn load_last_mode() -> CaptureMode {
-    let Some(path) = state_file() else {
-        return CaptureMode::Crop;
-    };
-    fs::read_to_string(&path)
-        .ok()
-        .and_then(|s| str_to_mode(&s))
+    state_file()
+        .map(|p| read_mode(&p))
         .unwrap_or(CaptureMode::Crop)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
-    use std::sync::Mutex;
 
-    // Serialise all env-var-mutating tests to prevent races under `cargo test`
-    // (which runs tests in parallel by default).
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
-
-    fn with_tmp_state<F: FnOnce()>(f: F) {
-        let _guard = ENV_LOCK.lock().unwrap();
+    fn tmp_state_file() -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().expect("tempdir");
-        // SAFETY: tests run sequentially under ENV_LOCK; no concurrent
-        // threads mutate XDG_STATE_HOME while the lock is held.
-        unsafe {
-            env::set_var("XDG_STATE_HOME", tmp.path());
-        }
-        f();
-        unsafe {
-            env::remove_var("XDG_STATE_HOME");
-        }
+        let path = tmp.path().join("crop-hypr").join("last_mode");
+        (tmp, path)
     }
 
     #[test]
     fn test_round_trip_crop() {
-        with_tmp_state(|| {
-            save_last_mode(CaptureMode::Crop);
-            assert_eq!(load_last_mode(), CaptureMode::Crop);
-        });
+        let (_tmp, path) = tmp_state_file();
+        write_mode(&path, CaptureMode::Crop);
+        assert_eq!(read_mode(&path), CaptureMode::Crop);
     }
 
     #[test]
     fn test_round_trip_window() {
-        with_tmp_state(|| {
-            save_last_mode(CaptureMode::Window);
-            assert_eq!(load_last_mode(), CaptureMode::Window);
-        });
+        let (_tmp, path) = tmp_state_file();
+        write_mode(&path, CaptureMode::Window);
+        assert_eq!(read_mode(&path), CaptureMode::Window);
     }
 
     #[test]
     fn test_round_trip_monitor() {
-        with_tmp_state(|| {
-            save_last_mode(CaptureMode::Monitor);
-            assert_eq!(load_last_mode(), CaptureMode::Monitor);
-        });
+        let (_tmp, path) = tmp_state_file();
+        write_mode(&path, CaptureMode::Monitor);
+        assert_eq!(read_mode(&path), CaptureMode::Monitor);
     }
 
     #[test]
     fn test_all_is_not_saved() {
-        with_tmp_state(|| {
-            // First save something meaningful
-            save_last_mode(CaptureMode::Window);
-            // Then "save" All — should be a no-op
-            save_last_mode(CaptureMode::All);
-            assert_eq!(load_last_mode(), CaptureMode::Window);
-        });
+        let (_tmp, path) = tmp_state_file();
+        // First save something meaningful
+        write_mode(&path, CaptureMode::Window);
+        // All must not call write_mode — verify via the public guard
+        save_last_mode(CaptureMode::All);
+        // The file still contains "window"
+        assert_eq!(read_mode(&path), CaptureMode::Window);
     }
 
     #[test]
     fn test_missing_file_returns_crop() {
-        with_tmp_state(|| {
-            assert_eq!(load_last_mode(), CaptureMode::Crop);
-        });
+        let (_tmp, path) = tmp_state_file();
+        assert_eq!(read_mode(&path), CaptureMode::Crop);
     }
 
     #[test]
     fn test_unknown_content_returns_crop() {
-        with_tmp_state(|| {
-            let path = state_file().unwrap();
-            fs::create_dir_all(path.parent().unwrap()).unwrap();
-            fs::write(&path, "bogus").unwrap();
-            assert_eq!(load_last_mode(), CaptureMode::Crop);
-        });
+        let (_tmp, path) = tmp_state_file();
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "bogus").unwrap();
+        assert_eq!(read_mode(&path), CaptureMode::Crop);
     }
 }

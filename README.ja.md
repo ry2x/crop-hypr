@@ -145,7 +145,7 @@ all     = "󰁌"
 cancel  = "󰖭"
 
 # ── フリーズモード UI カラー ──────────────────────────────────────────────────
-# 色は [赤, 緑, 青, 不透明度] の浮動小数点配列で、各値は 0.0〜1.0 の範囲です。
+# 色は CSS 形式の 16 進 RGBA 文字列 `"#RRGGBBAA"` で指定します。
 # すべてのキーは省略可能で、省略した場合は以下の既定値が使用されます。
 
 # [freeze_colors.overlay]
@@ -183,7 +183,7 @@ cancel  = "󰖭"
 # stroke_hovered = "#4D99FFFF"
 # label_text     = "#FFFFFFFF"
 # hint_text      = "#CCE6FFE6"  # "Click to capture"
-# name_text_idle = "#FFFFFF80"  # ホバーしていないときのモニター名  # ホバーしていないときのモニター名
+# name_text_idle = "#FFFFFF80"  # ホバーしていないときのモニター名
 
 # [freeze_colors.crop_frame]
 # stroke     = "#FFFFFFFF"
