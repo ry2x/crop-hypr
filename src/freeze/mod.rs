@@ -1,5 +1,7 @@
 mod app;
 
+pub use app::CaptureMode;
+
 use app::{AppState, Message, app_subscription, app_update, app_view};
 use iced::Task;
 use iced::widget::image as iced_image;
@@ -15,6 +17,7 @@ use std::{
 
 use crate::config::Config;
 use crate::error::{AppError, Result};
+use crate::freeze_state;
 use crate::hyprland::{self, ScreenRect};
 use crate::screencopy;
 
@@ -26,6 +29,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     } else {
         hyprland::BorderStyle::default()
     };
+    let initial_mode = freeze_state::load_last_mode();
 
     let monitors_raw = monitors_t.join().expect("monitors thread panicked")?;
     let clients_raw = clients_t.join().expect("clients thread panicked")?;
@@ -115,6 +119,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     glyphs.clone(),
                     toolbar_position,
                     border_style,
+                    initial_mode,
                 );
                 (state, Task::batch(spawn_tasks))
             },

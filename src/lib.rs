@@ -4,6 +4,7 @@ pub mod cmd;
 pub mod config;
 pub mod error;
 pub mod freeze;
+pub mod freeze_state;
 pub mod hyprland;
 pub mod notify;
 pub mod portal;

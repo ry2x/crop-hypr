@@ -16,6 +16,7 @@ use iced::{
 };
 
 use crate::config::{FreezeGlyphs, ToolbarPosition};
+use crate::freeze_state;
 use crate::hyprland::{BorderStyle, MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
@@ -286,9 +287,10 @@ impl AppState {
         glyphs: FreezeGlyphs,
         toolbar_position: ToolbarPosition,
         border_style: BorderStyle,
+        initial_mode: CaptureMode,
     ) -> Self {
         Self {
-            mode: CaptureMode::Crop,
+            mode: initial_mode,
             monitor_images,
             focused_monitor_idx,
             window_to_monitor,
@@ -310,6 +312,7 @@ impl AppState {
             }
             Message::ModeSelected(mode) => {
                 self.mode = mode;
+                freeze_state::save_last_mode(mode);
             }
             Message::SelectionConfirmed(rect) => {
                 *self.result.lock().unwrap() = Some(Some(rect));
