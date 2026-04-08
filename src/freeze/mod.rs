@@ -1,6 +1,8 @@
 mod app;
 
-use app::{AppState, Message, app_subscription, app_update, app_view};
+pub use app::CaptureMode;
+
+use app::{AppState, AppStateConfig, Message, app_subscription, app_update, app_view};
 use iced::Task;
 use iced::widget::image as iced_image;
 use iced_layershell::{
@@ -15,12 +17,19 @@ use std::{
 
 use crate::config::Config;
 use crate::error::{AppError, Result};
+use crate::freeze_state;
 use crate::hyprland::{self, ScreenRect};
 use crate::screencopy;
 
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
     let clients_t = std::thread::spawn(hyprland::get_clients);
+    let border_style = if cfg.capture_window_border {
+        hyprland::get_border_style()
+    } else {
+        hyprland::BorderStyle::default()
+    };
+    let initial_mode = freeze_state::load_last_mode();
 
     let monitors_raw = monitors_t.join().expect("monitors thread panicked")?;
     let clients_raw = clients_t.join().expect("clients thread panicked")?;
@@ -87,6 +96,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         let mons = Arc::new(monitors);
         let glyphs = cfg.freeze_glyphs.clone();
         let toolbar_position = cfg.toolbar_position;
+        let colors = cfg.freeze_colors;
 
         iced_layershell::daemon(
             move || {
@@ -100,16 +110,19 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     })
                     .collect();
 
-                let state = AppState::new(
-                    monitor_images.clone(),
+                let state = AppState::new(AppStateConfig {
+                    monitor_images: monitor_images.clone(),
                     focused_monitor_idx,
-                    window_to_monitor.clone(),
-                    Arc::clone(&wins),
-                    Arc::clone(&mons),
-                    result_clone.clone(),
-                    glyphs.clone(),
+                    window_to_monitor: window_to_monitor.clone(),
+                    windows: Arc::clone(&wins),
+                    monitors: Arc::clone(&mons),
+                    result: result_clone.clone(),
+                    glyphs: glyphs.clone(),
                     toolbar_position,
-                );
+                    border_style,
+                    initial_mode,
+                    colors,
+                });
                 (state, Task::batch(spawn_tasks))
             },
             "crop-hypr-freeze",

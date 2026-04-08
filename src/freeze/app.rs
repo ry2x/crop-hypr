@@ -15,8 +15,12 @@ use iced::{
     },
 };
 
-use crate::config::{FreezeGlyphs, ToolbarPosition};
-use crate::hyprland::{MonitorInfo, ScreenRect, WindowInfo};
+use crate::config::{
+    CropFrameColors, FreezeColors, FreezeGlyphs, MonitorFrameColors, RgbaColor, ToolbarPosition,
+    WindowFrameColors,
+};
+use crate::freeze_state;
+use crate::hyprland::{BorderStyle, MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +56,11 @@ pub struct SelectionCanvas {
     /// Canvas coordinates are local (0,0 = top-left of this monitor).
     /// `canvas_local = global - offset`
     pub monitor_offset: Point,
+    /// Hyprland border style (size + rounding). Applied when drawing and
+    /// confirming window-mode selections.
+    pub border_style: BorderStyle,
+    /// User-configured colors for the canvas overlay.
+    pub colors: FreezeColors,
 }
 
 // Canvas-internal mutable state
@@ -95,9 +104,12 @@ impl canvas::Program<Message> for SelectionCanvas {
                     DrawPhase::Idle => {
                         let prev = state.hovered;
                         state.hovered = match self.mode {
-                            CaptureMode::Window => {
-                                hit_index(&self.windows, pos, self.monitor_offset)
-                            }
+                            CaptureMode::Window => hit_index(
+                                &self.windows,
+                                pos,
+                                self.monitor_offset,
+                                self.border_style.border_size,
+                            ),
                             CaptureMode::Monitor => {
                                 hit_index_m(&self.monitors, pos, self.monitor_offset)
                             }
@@ -127,7 +139,7 @@ impl canvas::Program<Message> for SelectionCanvas {
                     }
                     CaptureMode::Window => {
                         if let Some(idx) = state.hovered {
-                            let rect = self.windows[idx].rect;
+                            let rect = self.windows[idx].rect.expand(self.border_style.border_size);
                             return Some(
                                 canvas::Action::publish(Message::SelectionConfirmed(rect))
                                     .and_capture(),
@@ -186,13 +198,13 @@ impl canvas::Program<Message> for SelectionCanvas {
 
         frame.fill(
             &canvas::Path::rectangle(Point::ORIGIN, bounds.size()),
-            iced::Color::from_rgba(0.0, 0.0, 0.0, 0.35),
+            to_iced(self.colors.overlay.background),
         );
 
         match self.mode {
             CaptureMode::Crop => {
                 if let DrawPhase::Cropping { start } = state.phase {
-                    draw_selection(&mut frame, start, state.cursor);
+                    draw_selection(&mut frame, start, state.cursor, &self.colors.crop_frame);
                 }
             }
             CaptureMode::Window => {
@@ -203,6 +215,8 @@ impl canvas::Program<Message> for SelectionCanvas {
                         state.hovered == Some(i),
                         &win.title,
                         self.monitor_offset,
+                        self.border_style,
+                        &self.colors.window_frame,
                     );
                 }
             }
@@ -214,6 +228,7 @@ impl canvas::Program<Message> for SelectionCanvas {
                         state.hovered == Some(i),
                         &mon.name,
                         self.monitor_offset,
+                        &self.colors.monitor_frame,
                     );
                 }
             }
@@ -243,6 +258,21 @@ impl canvas::Program<Message> for SelectionCanvas {
 
 // ── App State ─────────────────────────────────────────────────────────────────
 
+/// All construction data for [`AppState`], grouped to avoid a long argument list.
+pub struct AppStateConfig {
+    pub monitor_images: Vec<image::Handle>,
+    pub focused_monitor_idx: usize,
+    pub window_to_monitor: HashMap<iced::window::Id, usize>,
+    pub windows: Arc<Vec<WindowInfo>>,
+    pub monitors: Arc<Vec<MonitorInfo>>,
+    pub result: Arc<Mutex<Option<Option<ScreenRect>>>>,
+    pub glyphs: FreezeGlyphs,
+    pub toolbar_position: ToolbarPosition,
+    pub border_style: BorderStyle,
+    pub initial_mode: CaptureMode,
+    pub colors: FreezeColors,
+}
+
 pub struct AppState {
     pub mode: CaptureMode,
     /// One pre-decoded image handle per monitor (indexed same as `monitors`)
@@ -263,30 +293,25 @@ pub struct AppState {
     repaint_ticks: u8,
     glyphs: FreezeGlyphs,
     toolbar_position: ToolbarPosition,
+    border_style: BorderStyle,
+    colors: FreezeColors,
 }
 
 impl AppState {
-    pub fn new(
-        monitor_images: Vec<image::Handle>,
-        focused_monitor_idx: usize,
-        window_to_monitor: HashMap<iced::window::Id, usize>,
-        windows: Arc<Vec<WindowInfo>>,
-        monitors: Arc<Vec<MonitorInfo>>,
-        result: Arc<Mutex<Option<Option<ScreenRect>>>>,
-        glyphs: FreezeGlyphs,
-        toolbar_position: ToolbarPosition,
-    ) -> Self {
+    pub fn new(cfg: AppStateConfig) -> Self {
         Self {
-            mode: CaptureMode::Crop,
-            monitor_images,
-            focused_monitor_idx,
-            window_to_monitor,
-            windows,
-            monitors,
-            result,
+            mode: cfg.initial_mode,
+            monitor_images: cfg.monitor_images,
+            focused_monitor_idx: cfg.focused_monitor_idx,
+            window_to_monitor: cfg.window_to_monitor,
+            windows: cfg.windows,
+            monitors: cfg.monitors,
+            result: cfg.result,
             repaint_ticks: 6,
-            glyphs,
-            toolbar_position,
+            glyphs: cfg.glyphs,
+            toolbar_position: cfg.toolbar_position,
+            border_style: cfg.border_style,
+            colors: cfg.colors,
         }
     }
 
@@ -298,6 +323,7 @@ impl AppState {
             }
             Message::ModeSelected(mode) => {
                 self.mode = mode;
+                freeze_state::save_last_mode(mode);
             }
             Message::SelectionConfirmed(rect) => {
                 *self.result.lock().unwrap() = Some(Some(rect));
@@ -339,6 +365,8 @@ impl AppState {
             windows: Arc::clone(&self.windows),
             monitors: Arc::clone(&self.monitors),
             monitor_offset,
+            border_style: self.border_style,
+            colors: self.colors,
         };
 
         let toolbar = self.toolbar();
@@ -374,19 +402,59 @@ impl AppState {
 
     fn toolbar(&self) -> Element<'_, Message> {
         let btn = |label: &str, mode: CaptureMode, active: bool| {
-            button(Text::new(label.to_owned()).size(22))
+            let btn_colors = self.colors.button;
+            let (base_bg, base_text) = if active {
+                (btn_colors.active_background, btn_colors.active_text)
+            } else {
+                (btn_colors.idle_background, btn_colors.idle_text)
+            };
+            let hover_bg = btn_colors.hover_background;
+            let hover_text = btn_colors.hover_text;
+            button(Text::new(label.to_owned()).size(26))
                 .on_press(Message::ModeSelected(mode))
-                .style(if active {
-                    button::primary
-                } else {
-                    button::secondary
+                .style(move |_theme, status| {
+                    let (bg, text) = match status {
+                        button::Status::Hovered | button::Status::Pressed => (hover_bg, hover_text),
+                        _ => (base_bg, base_text),
+                    };
+                    button::Style {
+                        background: Some(iced::Background::Color(to_iced(bg))),
+                        text_color: to_iced(text),
+                        border: iced::Border {
+                            radius: 2.0.into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }
                 })
                 .padding([10, 18])
         };
-        let cancel_btn = button(Text::new(self.glyphs.cancel.as_str()).size(22))
-            .on_press(Message::Cancel)
-            .style(button::danger)
-            .padding([10, 18]);
+
+        let cancel_colors = self.colors.cancel_button;
+        let cancel_btn = {
+            let idle_bg = cancel_colors.idle_background;
+            let idle_text = cancel_colors.idle_text;
+            let hover_bg = cancel_colors.hover_background;
+            let hover_text = cancel_colors.hover_text;
+            button(Text::new(self.glyphs.cancel.as_str()).size(26))
+                .on_press(Message::Cancel)
+                .style(move |_theme, status| {
+                    let (bg, text) = match status {
+                        button::Status::Hovered | button::Status::Pressed => (hover_bg, hover_text),
+                        _ => (idle_bg, idle_text),
+                    };
+                    button::Style {
+                        background: Some(iced::Background::Color(to_iced(bg))),
+                        text_color: to_iced(text),
+                        border: iced::Border {
+                            radius: 2.0.into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }
+                })
+                .padding([10, 18])
+        };
 
         let vertical = matches!(
             self.toolbar_position,
@@ -437,11 +505,10 @@ impl AppState {
                 .into()
         };
 
+        let toolbar_bg = self.colors.toolbar.background;
         Container::new(buttons)
-            .style(|_theme| iced::widget::container::Style {
-                background: Some(iced::Background::Color(iced::Color::from_rgba(
-                    0.08, 0.08, 0.08, 0.85,
-                ))),
+            .style(move |_theme| iced::widget::container::Style {
+                background: Some(iced::Background::Color(to_iced(toolbar_bg))),
                 border: iced::Border {
                     radius: 12.0.into(),
                     ..Default::default()
@@ -479,7 +546,12 @@ impl AppState {
 
 // ── Drawing helpers ───────────────────────────────────────────────────────────
 
-fn draw_selection(frame: &mut canvas::Frame, start: Point, end: Point) {
+/// Convert an [`RgbaColor`] config value to an [`iced::Color`].
+fn to_iced(c: RgbaColor) -> iced::Color {
+    iced::Color::from_rgba(c.0[0], c.0[1], c.0[2], c.0[3])
+}
+
+fn draw_selection(frame: &mut canvas::Frame, start: Point, end: Point, colors: &CropFrameColors) {
     let x = start.x.min(end.x);
     let y = start.y.min(end.y);
     let w = (start.x - end.x).abs();
@@ -495,7 +567,7 @@ fn draw_selection(frame: &mut canvas::Frame, start: Point, end: Point) {
     frame.stroke(
         &path,
         canvas::Stroke::default()
-            .with_color(iced::Color::WHITE)
+            .with_color(to_iced(colors.stroke))
             .with_width(1.5),
     );
 
@@ -506,7 +578,7 @@ fn draw_selection(frame: &mut canvas::Frame, start: Point, end: Point) {
             y: (y - 20.0).max(2.0),
         },
         size: iced::Pixels(13.0),
-        color: iced::Color::WHITE,
+        color: to_iced(colors.label_text),
         ..canvas::Text::default()
     });
 }
@@ -517,38 +589,40 @@ fn draw_highlight(
     hovered: bool,
     label: &str,
     offset: Point,
+    border_style: BorderStyle,
+    colors: &WindowFrameColors,
 ) {
-    let (fill_a, stroke_a, stroke_w) = if hovered {
-        (0.55f32, 1.0f32, 2.0f32)
+    let (fill, stroke, stroke_w) = if hovered {
+        (colors.fill_hovered, colors.stroke_hovered, 2.0f32)
     } else {
-        (0.20, 0.7, 1.0)
+        (colors.fill_idle, colors.stroke_idle, 1.0f32)
     };
+
+    let expanded = rect.expand(border_style.border_size);
     // Convert global → canvas-local by subtracting monitor origin
-    let x = rect.x as f32 - offset.x;
-    let y = rect.y as f32 - offset.y;
-    let w = rect.w as f32;
-    let h = rect.h as f32;
+    let x = expanded.x as f32 - offset.x;
+    let y = expanded.y as f32 - offset.y;
+    let w = expanded.w as f32;
+    let h = expanded.h as f32;
 
-    frame.fill_rectangle(
-        Point { x, y },
-        iced::Size {
-            width: w,
-            height: h,
-        },
-        iced::Color::from_rgba(0.27, 0.52, 1.0, fill_a),
-    );
+    let size = iced::Size {
+        width: w,
+        height: h,
+    };
+    let top_left = Point { x, y };
+    let radius = iced::border::Radius::from(border_style.rounding as f32);
 
-    let path = canvas::Path::rectangle(
-        Point { x, y },
-        iced::Size {
-            width: w,
-            height: h,
-        },
-    );
+    let path = if border_style.rounding > 0 {
+        canvas::Path::rounded_rectangle(top_left, size, radius)
+    } else {
+        canvas::Path::rectangle(top_left, size)
+    };
+
+    frame.fill(&path, to_iced(fill));
     frame.stroke(
         &path,
         canvas::Stroke::default()
-            .with_color(iced::Color::from_rgba(0.3, 0.6, 1.0, stroke_a))
+            .with_color(to_iced(stroke))
             .with_width(stroke_w),
     );
 
@@ -560,7 +634,7 @@ fn draw_highlight(
             content: label.to_owned(),
             position: Point { x: cx, y: cy },
             size: iced::Pixels(font_size),
-            color: iced::Color::from_rgba(1.0, 1.0, 1.0, 1.0),
+            color: to_iced(colors.label_text),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Center,
             ..canvas::Text::default()
@@ -573,7 +647,7 @@ fn draw_highlight(
                 y: cy + font_size * 0.7,
             },
             size: iced::Pixels((font_size * 0.45).clamp(10.0, 14.0)),
-            color: iced::Color::from_rgba(0.8, 0.9, 1.0, 0.9),
+            color: to_iced(colors.hint_text),
             align_x: iced::alignment::Horizontal::Center.into(),
             ..canvas::Text::default()
         });
@@ -589,40 +663,34 @@ fn draw_monitor_highlight(
     hovered: bool,
     label: &str,
     offset: Point,
+    colors: &MonitorFrameColors,
 ) {
     let x = rect.x as f32 - offset.x;
     let y = rect.y as f32 - offset.y;
     let w = rect.w as f32;
     let h = rect.h as f32;
 
-    // Fill: hovered = obvious tint, not-hovered = very subtle
-    let fill_alpha = if hovered { 0.40f32 } else { 0.08 };
-    frame.fill_rectangle(
-        Point { x, y },
-        iced::Size {
-            width: w,
-            height: h,
-        },
-        iced::Color::from_rgba(0.27, 0.52, 1.0, fill_alpha),
-    );
-
-    // Border: thick + bright when hovered, thin + dim otherwise
-    let (stroke_a, stroke_w) = if hovered {
-        (1.0f32, 3.0f32)
+    let fill = if hovered {
+        colors.fill_hovered
     } else {
-        (0.35, 1.0)
+        colors.fill_idle
     };
-    let path = canvas::Path::rectangle(
-        Point { x, y },
-        iced::Size {
-            width: w,
-            height: h,
-        },
-    );
+    let (stroke, stroke_w) = if hovered {
+        (colors.stroke_hovered, 3.0f32)
+    } else {
+        (colors.stroke_idle, 1.0f32)
+    };
+    let size = iced::Size {
+        width: w,
+        height: h,
+    };
+    let top_left = Point { x, y };
+    let path = canvas::Path::rectangle(top_left, size);
+    frame.fill(&path, to_iced(fill));
     frame.stroke(
         &path,
         canvas::Stroke::default()
-            .with_color(iced::Color::from_rgba(0.3, 0.6, 1.0, stroke_a))
+            .with_color(to_iced(stroke))
             .with_width(stroke_w),
     );
 
@@ -631,11 +699,16 @@ fn draw_monitor_highlight(
         let font_size = (h * 0.06).clamp(18.0, 48.0);
         let cx = x + w * 0.5;
         let cy = y + h * 0.5;
+        let name_color = if hovered {
+            colors.label_text
+        } else {
+            colors.name_text_idle
+        };
         frame.fill_text(canvas::Text {
             content: label.to_owned(),
             position: Point { x: cx, y: cy },
             size: iced::Pixels(font_size),
-            color: iced::Color::from_rgba(1.0, 1.0, 1.0, if hovered { 1.0 } else { 0.5 }),
+            color: to_iced(name_color),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Center,
             ..canvas::Text::default()
@@ -649,7 +722,7 @@ fn draw_monitor_highlight(
                     y: cy + font_size * 0.7,
                 },
                 size: iced::Pixels((font_size * 0.45).clamp(12.0, 20.0)),
-                color: iced::Color::from_rgba(0.8, 0.9, 1.0, 0.9),
+                color: to_iced(colors.hint_text),
                 align_x: iced::alignment::Horizontal::Center.into(),
                 ..canvas::Text::default()
             });
@@ -668,7 +741,12 @@ fn points_to_rect(a: Point, b: Point) -> ScreenRect {
     }
 }
 
-fn hit_index(windows: &[WindowInfo], pos: Option<Point>, offset: Point) -> Option<usize> {
+fn hit_index(
+    windows: &[WindowInfo],
+    pos: Option<Point>,
+    offset: Point,
+    border_size: u32,
+) -> Option<usize> {
     let p = pos?;
     // Convert canvas-local cursor to global for comparison with hyprctl rects
     let gx = p.x + offset.x;
@@ -680,7 +758,7 @@ fn hit_index(windows: &[WindowInfo], pos: Option<Point>, offset: Point) -> Optio
         .iter()
         .enumerate()
         .filter(|(_, w)| {
-            let r = w.rect;
+            let r = w.rect.expand(border_size);
             gx >= r.x as f32
                 && gx <= (r.x + r.w) as f32
                 && gy >= r.y as f32

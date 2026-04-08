@@ -142,11 +142,25 @@ pub fn capture_crop(cfg: &Config) -> Result<PathBuf> {
 
 pub fn capture_window(cfg: &Config) -> Result<PathBuf> {
     let info = hyprland::get_active_window()?;
-    // Keep window position as i32: coordinates can be negative for off-screen windows.
-    let win_x = info.at[0];
-    let win_y = info.at[1];
-    let win_w = info.size[0].max(0) as u32;
-    let win_h = info.size[1].max(0) as u32;
+
+    let border_size = if cfg.capture_window_border {
+        hyprland::get_border_style().border_size
+    } else {
+        0
+    };
+
+    let win_rect = hyprland::ScreenRect {
+        x: info.at[0],
+        y: info.at[1],
+        w: info.size[0],
+        h: info.size[1],
+    }
+    .expand(border_size);
+
+    let win_x = win_rect.x;
+    let win_y = win_rect.y;
+    let win_w = win_rect.w.max(0) as u32;
+    let win_h = win_rect.h.max(0) as u32;
 
     // Identify the monitor that contains the window's top-left corner.
     // Windows spanning multiple monitors are captured from the monitor containing their top-left corner only.

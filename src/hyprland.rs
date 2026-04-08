@@ -13,6 +13,19 @@ pub struct ScreenRect {
     pub h: i32,
 }
 
+impl ScreenRect {
+    /// Expand the rect outward by `border_size` on every side (in logical pixels).
+    pub fn expand(self, border_size: u32) -> Self {
+        let b = border_size as i32;
+        Self {
+            x: self.x - b,
+            y: self.y - b,
+            w: self.w + 2 * b,
+            h: self.h + 2 * b,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct WindowInfo {
     pub rect: ScreenRect,
@@ -101,6 +114,34 @@ pub fn hyprland_ipc<T: for<'de> Deserialize<'de>>(cmd: &str) -> Result<T> {
     let parsed: T =
         serde_json::from_slice(&buf).map_err(|e| AppError::HyprlandJson(cmd.to_string(), e))?;
     Ok(parsed)
+}
+
+#[derive(Deserialize, Debug)]
+pub struct HyprOption {
+    pub int: i64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BorderStyle {
+    /// Hyprland `general:border_size` in logical pixels.
+    pub border_size: u32,
+    /// Hyprland `decoration:rounding` in logical pixels.
+    pub rounding: u32,
+}
+
+/// Fetch `general:border_size` and `decoration:rounding` from Hyprland IPC.
+/// Falls back to `BorderStyle::default()` on any error.
+pub fn get_border_style() -> BorderStyle {
+    let bs = hyprland_ipc::<HyprOption>("getoption general:border_size")
+        .map(|o| o.int.max(0) as u32)
+        .unwrap_or(0);
+    let rd = hyprland_ipc::<HyprOption>("getoption decoration:rounding")
+        .map(|o| o.int.max(0) as u32)
+        .unwrap_or(0);
+    BorderStyle {
+        border_size: bs,
+        rounding: rd,
+    }
 }
 
 pub fn get_active_window() -> Result<HyprActiveWindow> {
