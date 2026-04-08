@@ -6,6 +6,295 @@ use std::{
 
 use crate::error::{AppError, Result};
 
+// ── RGBA color ────────────────────────────────────────────────────────────────
+
+/// An RGBA color stored as `[red, green, blue, alpha]` with each component in
+/// `[0.0, 1.0]`. Serialised and deserialised as a TOML array of four floats,
+/// e.g. `[0.27, 0.52, 1.0, 0.55]`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct RgbaColor(pub [f32; 4]);
+
+impl RgbaColor {
+    pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self([r, g, b, a])
+    }
+}
+
+// ── Freeze mode color config ──────────────────────────────────────────────────
+
+/// Semi-transparent black overlay drawn over the frozen screen image.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct OverlayColors {
+    #[serde(default = "default_overlay_background")]
+    pub background: RgbaColor,
+}
+fn default_overlay_background() -> RgbaColor {
+    RgbaColor::new(0.0, 0.0, 0.0, 0.35)
+}
+impl Default for OverlayColors {
+    fn default() -> Self {
+        Self {
+            background: default_overlay_background(),
+        }
+    }
+}
+
+/// Background pill that contains the mode buttons and cancel button.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ToolbarColors {
+    #[serde(default = "default_toolbar_background")]
+    pub background: RgbaColor,
+}
+fn default_toolbar_background() -> RgbaColor {
+    RgbaColor::new(0.08, 0.08, 0.08, 0.85)
+}
+impl Default for ToolbarColors {
+    fn default() -> Self {
+        Self {
+            background: default_toolbar_background(),
+        }
+    }
+}
+
+/// Crop / Window / Monitor / All mode buttons.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ButtonColors {
+    /// Unselected button background.
+    #[serde(default = "default_btn_idle_bg")]
+    pub idle_background: RgbaColor,
+    /// Unselected button text.
+    #[serde(default = "default_btn_idle_text")]
+    pub idle_text: RgbaColor,
+    /// Selected (active) button background.
+    #[serde(default = "default_btn_active_bg")]
+    pub active_background: RgbaColor,
+    /// Selected button text.
+    #[serde(default = "default_btn_active_text")]
+    pub active_text: RgbaColor,
+    /// Hovered button background (both selected and unselected).
+    #[serde(default = "default_btn_hover_bg")]
+    pub hover_background: RgbaColor,
+    /// Hovered button text.
+    #[serde(default = "default_btn_hover_text")]
+    pub hover_text: RgbaColor,
+}
+fn default_btn_idle_bg() -> RgbaColor {
+    RgbaColor::new(0.20, 0.20, 0.20, 1.0)
+}
+fn default_btn_idle_text() -> RgbaColor {
+    RgbaColor::new(0.90, 0.90, 0.90, 1.0)
+}
+fn default_btn_active_bg() -> RgbaColor {
+    RgbaColor::new(0.345, 0.396, 0.949, 1.0)
+}
+fn default_btn_active_text() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 1.0)
+}
+fn default_btn_hover_bg() -> RgbaColor {
+    RgbaColor::new(0.42, 0.475, 0.961, 1.0)
+}
+fn default_btn_hover_text() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 1.0)
+}
+impl Default for ButtonColors {
+    fn default() -> Self {
+        Self {
+            idle_background: default_btn_idle_bg(),
+            idle_text: default_btn_idle_text(),
+            active_background: default_btn_active_bg(),
+            active_text: default_btn_active_text(),
+            hover_background: default_btn_hover_bg(),
+            hover_text: default_btn_hover_text(),
+        }
+    }
+}
+
+/// Cancel / close button in the toolbar.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct CancelButtonColors {
+    #[serde(default = "default_cancel_idle_bg")]
+    pub idle_background: RgbaColor,
+    #[serde(default = "default_cancel_idle_text")]
+    pub idle_text: RgbaColor,
+    #[serde(default = "default_cancel_hover_bg")]
+    pub hover_background: RgbaColor,
+    #[serde(default = "default_cancel_hover_text")]
+    pub hover_text: RgbaColor,
+}
+fn default_cancel_idle_bg() -> RgbaColor {
+    RgbaColor::new(0.765, 0.259, 0.247, 1.0)
+}
+fn default_cancel_idle_text() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 1.0)
+}
+fn default_cancel_hover_bg() -> RgbaColor {
+    RgbaColor::new(0.831, 0.290, 0.278, 1.0)
+}
+fn default_cancel_hover_text() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 1.0)
+}
+impl Default for CancelButtonColors {
+    fn default() -> Self {
+        Self {
+            idle_background: default_cancel_idle_bg(),
+            idle_text: default_cancel_idle_text(),
+            hover_background: default_cancel_hover_bg(),
+            hover_text: default_cancel_hover_text(),
+        }
+    }
+}
+
+/// Highlight frame drawn over windows in Window-selection mode.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct WindowFrameColors {
+    #[serde(default = "default_wf_fill_idle")]
+    pub fill_idle: RgbaColor,
+    #[serde(default = "default_wf_fill_hovered")]
+    pub fill_hovered: RgbaColor,
+    #[serde(default = "default_wf_stroke_idle")]
+    pub stroke_idle: RgbaColor,
+    #[serde(default = "default_wf_stroke_hovered")]
+    pub stroke_hovered: RgbaColor,
+    /// Window title text shown when hovered.
+    #[serde(default = "default_wf_label_text")]
+    pub label_text: RgbaColor,
+    /// "Click to capture" hint shown when hovered.
+    #[serde(default = "default_wf_hint_text")]
+    pub hint_text: RgbaColor,
+}
+fn default_wf_fill_idle() -> RgbaColor {
+    RgbaColor::new(0.27, 0.52, 1.0, 0.20)
+}
+fn default_wf_fill_hovered() -> RgbaColor {
+    RgbaColor::new(0.27, 0.52, 1.0, 0.55)
+}
+fn default_wf_stroke_idle() -> RgbaColor {
+    RgbaColor::new(0.3, 0.6, 1.0, 0.70)
+}
+fn default_wf_stroke_hovered() -> RgbaColor {
+    RgbaColor::new(0.3, 0.6, 1.0, 1.0)
+}
+fn default_wf_label_text() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 1.0)
+}
+fn default_wf_hint_text() -> RgbaColor {
+    RgbaColor::new(0.8, 0.9, 1.0, 0.9)
+}
+impl Default for WindowFrameColors {
+    fn default() -> Self {
+        Self {
+            fill_idle: default_wf_fill_idle(),
+            fill_hovered: default_wf_fill_hovered(),
+            stroke_idle: default_wf_stroke_idle(),
+            stroke_hovered: default_wf_stroke_hovered(),
+            label_text: default_wf_label_text(),
+            hint_text: default_wf_hint_text(),
+        }
+    }
+}
+
+/// Highlight frame drawn over monitors in Monitor-selection mode.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct MonitorFrameColors {
+    #[serde(default = "default_mf_fill_idle")]
+    pub fill_idle: RgbaColor,
+    #[serde(default = "default_mf_fill_hovered")]
+    pub fill_hovered: RgbaColor,
+    #[serde(default = "default_mf_stroke_idle")]
+    pub stroke_idle: RgbaColor,
+    #[serde(default = "default_mf_stroke_hovered")]
+    pub stroke_hovered: RgbaColor,
+    /// Monitor name text when hovered.
+    #[serde(default = "default_mf_label_text")]
+    pub label_text: RgbaColor,
+    /// "Click to capture" hint shown when hovered.
+    #[serde(default = "default_mf_hint_text")]
+    pub hint_text: RgbaColor,
+    /// Monitor name text when not hovered (always visible at reduced opacity).
+    #[serde(default = "default_mf_name_text_idle")]
+    pub name_text_idle: RgbaColor,
+}
+fn default_mf_fill_idle() -> RgbaColor {
+    RgbaColor::new(0.27, 0.52, 1.0, 0.08)
+}
+fn default_mf_fill_hovered() -> RgbaColor {
+    RgbaColor::new(0.27, 0.52, 1.0, 0.40)
+}
+fn default_mf_stroke_idle() -> RgbaColor {
+    RgbaColor::new(0.3, 0.6, 1.0, 0.35)
+}
+fn default_mf_stroke_hovered() -> RgbaColor {
+    RgbaColor::new(0.3, 0.6, 1.0, 1.0)
+}
+fn default_mf_label_text() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 1.0)
+}
+fn default_mf_hint_text() -> RgbaColor {
+    RgbaColor::new(0.8, 0.9, 1.0, 0.9)
+}
+fn default_mf_name_text_idle() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 0.5)
+}
+impl Default for MonitorFrameColors {
+    fn default() -> Self {
+        Self {
+            fill_idle: default_mf_fill_idle(),
+            fill_hovered: default_mf_fill_hovered(),
+            stroke_idle: default_mf_stroke_idle(),
+            stroke_hovered: default_mf_stroke_hovered(),
+            label_text: default_mf_label_text(),
+            hint_text: default_mf_hint_text(),
+            name_text_idle: default_mf_name_text_idle(),
+        }
+    }
+}
+
+/// Rubber-band rectangle and size label in Crop-selection mode.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct CropFrameColors {
+    #[serde(default = "default_crop_stroke")]
+    pub stroke: RgbaColor,
+    #[serde(default = "default_crop_label_text")]
+    pub label_text: RgbaColor,
+}
+fn default_crop_stroke() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 1.0)
+}
+fn default_crop_label_text() -> RgbaColor {
+    RgbaColor::new(1.0, 1.0, 1.0, 1.0)
+}
+impl Default for CropFrameColors {
+    fn default() -> Self {
+        Self {
+            stroke: default_crop_stroke(),
+            label_text: default_crop_label_text(),
+        }
+    }
+}
+
+/// All user-configurable colors for the freeze-mode overlay UI.
+///
+/// Every sub-table is optional in TOML; omitted keys fall back to the defaults
+/// shown in the sample config.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct FreezeColors {
+    #[serde(default)]
+    pub overlay: OverlayColors,
+    #[serde(default)]
+    pub toolbar: ToolbarColors,
+    #[serde(default)]
+    pub button: ButtonColors,
+    #[serde(default)]
+    pub cancel_button: CancelButtonColors,
+    #[serde(default)]
+    pub window_frame: WindowFrameColors,
+    #[serde(default)]
+    pub monitor_frame: MonitorFrameColors,
+    #[serde(default)]
+    pub crop_frame: CropFrameColors,
+}
+
 // ── Freeze UI glyphs ──────────────────────────────────────────────────────────
 
 /// Icon glyphs displayed in the freeze-mode toolbar.
@@ -86,6 +375,11 @@ pub struct Config {
     /// rounded highlight frames matching `decoration:rounding`.
     #[serde(default = "default_capture_window_border")]
     pub capture_window_border: bool,
+
+    /// Colors for every element of the freeze-mode overlay UI.
+    /// All keys are optional; omitted keys fall back to the built-in defaults.
+    #[serde(default)]
+    pub freeze_colors: FreezeColors,
 }
 
 fn default_capture_window_border() -> bool {
@@ -110,6 +404,7 @@ impl Default for Config {
             freeze_glyphs: FreezeGlyphs::default(),
             toolbar_position: ToolbarPosition::default(),
             capture_window_border: default_capture_window_border(),
+            freeze_colors: FreezeColors::default(),
         }
     }
 }

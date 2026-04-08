@@ -96,6 +96,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         let mons = Arc::new(monitors);
         let glyphs = cfg.freeze_glyphs.clone();
         let toolbar_position = cfg.toolbar_position;
+        let colors = cfg.freeze_colors;
 
         iced_layershell::daemon(
             move || {
@@ -120,6 +121,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     toolbar_position,
                     border_style,
                     initial_mode,
+                    colors,
                 });
                 (state, Task::batch(spawn_tasks))
             },
