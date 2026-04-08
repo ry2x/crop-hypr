@@ -152,7 +152,7 @@ cancel  = "󰖭"
 | `save_path` | path | XDG Pictures ディレクトリ + `/Screenshots`（fallback: `$HOME/Screenshots`） | 保存先ディレクトリ |
 | `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | ファイル名のstrftimeパターン（拡張子なし） |
 | `toolbar_position` | string | `top` | フリーズツールバーの表示位置: `top`, `bottom`, `left`, `right` |
-| `capture_window_border` | bool | `true` | ウィンドウキャプチャにHyprlandのウィンドウ枠を含める。フリーズモードでは角丸ハイライト枠も表示 |
+| `capture_window_border` | bool | `false` | ウィンドウキャプチャにHyprlandのウィンドウ枠を含める。フリーズモードでは角丸ハイライト枠も表示 |
 | `freeze_glyphs.crop` | string | `󰆟` (U+F019F) | cropモードのアイコン |
 | `freeze_glyphs.window` | string | `` (U+EB7F) | windowモードのアイコン |
 | `freeze_glyphs.monitor` | string | `󰍹` (U+F0379) | monitorモードのアイコン |

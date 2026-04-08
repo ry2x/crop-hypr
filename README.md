@@ -156,7 +156,7 @@ cancel  = "󰖭"
 | `save_path` | path | XDG Pictures dir + `/Screenshots` (fallback: `$HOME/Screenshots`) | Destination directory for saved screenshots |
 | `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | strftime pattern for filenames (no extension) |
 | `toolbar_position` | string | `top` | Freeze toolbar edge: `top`, `bottom`, `left`, or `right` |
-| `capture_window_border` | bool | `true` | Include Hyprland window border in window captures; also draws rounded highlights in freeze mode |
+| `capture_window_border` | bool | `false` | Include Hyprland window border in window captures; also draws rounded highlights in freeze mode |
 | `freeze_glyphs.crop` | string | `󰆟` (U+F019F) | Toolbar icon for crop mode |
 | `freeze_glyphs.window` | string | `` (U+EB7F) | Toolbar icon for window mode |
 | `freeze_glyphs.monitor` | string | `󰍹` (U+F0379) | Toolbar icon for monitor mode |
