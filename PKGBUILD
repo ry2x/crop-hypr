@@ -1,11 +1,11 @@
 # Maintainer: ry2x
 
-pkgname=crop-hypr
-pkgver=0.4.1
+pkgname=hyprcrop
+pkgver=0.4.2
 pkgrel=1
 pkgdesc="A fast, Hyprland-native screenshot tool written in Rust"
 arch=('x86_64')
-url="https://github.com/ry2x/crop-hypr"
+url="https://github.com/ry2x/hyprcrop"
 license=('MIT')
 depends=('slurp' 'wl-clipboard' 'hyprland' 'libnotify' 'pipewire')
 makedepends=('rust' 'cargo' 'clang' 'pkgconf')
@@ -40,4 +40,5 @@ package() {
     cd "$pkgname-$pkgver"
     install -Dm755 "target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
     install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

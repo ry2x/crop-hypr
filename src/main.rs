@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use crop_hypr::config::Config;
-use crop_hypr::error::{AppError, Result};
-use crop_hypr::{capture, clipboard, freeze, notify};
+use hyprcrop::config::Config;
+use hyprcrop::error::{AppError, Result};
+use hyprcrop::{capture, clipboard, freeze, notify};
 
 #[derive(Parser)]
-#[command(name = "crop-hypr", about = "Hyprland screenshot tool", version)]
+#[command(name = "hyprcrop", about = "Hyprland screenshot tool", version)]
 struct Cli {
-    /// Path to a custom config file (defaults to ~/.config/crop-hypr/config.toml)
+    /// Path to a custom config file (defaults to ~/.config/hyprcrop/config.toml)
     #[arg(long, short, global = true, value_name = "FILE")]
     config: Option<PathBuf>,
 
@@ -30,7 +30,7 @@ enum Commands {
     All,
     /// Freeze screen and select region interactively
     Freeze,
-    /// Write a default config.toml to ~/.config/crop-hypr/config.toml (or --config path)
+    /// Write a default config.toml to ~/.config/hyprcrop/config.toml (or --config path)
     GenerateConfig {
         /// Overwrite the file if it already exists
         #[arg(long)]
