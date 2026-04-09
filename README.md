@@ -34,21 +34,21 @@ Window and monitor metadata is fetched directly via the **Hyprland IPC socket**
 
 ## Installation
 
+### Arch Linux (AUR)
+
+```sh
+yay -S hyprcrop
+# or
+paru -S hyprcrop
+```
+
+### Build from source (Manual)
+
 ```sh
 git clone https://github.com/ry2x/hyprcrop.git
 cd hyprcrop
 cargo build --release
 cp target/release/hyprcrop ~/.local/bin/
-```
-
-### For Arch Linux users
-
-A PKGBUILD is included for building an Arch package.
-
-```sh
-git clone https://github.com/ry2x/hyprcrop.git
-cd hyprcrop
-makepkg -si
 ```
 
 ## Usage
