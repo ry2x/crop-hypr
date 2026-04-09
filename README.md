@@ -1,4 +1,4 @@
-# crop-hypr
+# hyprcrop
 
 A fast, Hyprland-native screenshot tool written in Rust.
 
@@ -17,11 +17,11 @@ A fast, Hyprland-native screenshot tool written in Rust.
 
 The following tools must be available on `$PATH`:
 
-| Tool | Purpose |
-| ---- | ------- |
-| `slurp` | Interactive region selection (crop mode) |
-| `wl-copy` | Copy image to Wayland clipboard |
-| `notify-send` | Desktop notifications (optional) |
+| Tool          | Purpose                                  |
+| ------------- | ---------------------------------------- |
+| `slurp`       | Interactive region selection (crop mode) |
+| `wl-copy`     | Copy image to Wayland clipboard          |
+| `notify-send` | Desktop notifications (optional)         |
 
 Screen capture is performed natively via the **`zwlr_screencopy_manager_v1`** Wayland protocol
 (wlroots-based compositors: Hyprland, sway, etc.) — no external capture tool is required.
@@ -35,10 +35,10 @@ Window and monitor metadata is fetched directly via the **Hyprland IPC socket**
 ## Installation
 
 ```sh
-git clone https://github.com/ry2x/crop-hypr.git
-cd crop-hypr
+git clone https://github.com/ry2x/hyprcrop.git
+cd hyprcrop
 cargo build --release
-cp target/release/crop-hypr ~/.local/bin/
+cp target/release/hyprcrop ~/.local/bin/
 ```
 
 ### For Arch Linux users
@@ -46,26 +46,26 @@ cp target/release/crop-hypr ~/.local/bin/
 A PKGBUILD is included for building an Arch package.
 
 ```sh
-git clone https://github.com/ry2x/crop-hypr.git
-cd crop-hypr
+git clone https://github.com/ry2x/hyprcrop.git
+cd hyprcrop
 makepkg -si
 ```
 
 ## Usage
 
 ```sh
-crop-hypr [--config <FILE>] <SUBCOMMAND>
+hyprcrop [--config <FILE>] <SUBCOMMAND>
 ```
 
-| Subcommand | Description |
-| ---------- | ----------- |
-| `crop` | Select a region with slurp and capture it |
-| `window` | Capture the active window (geometry via Hyprland IPC) |
-| `portal` | Capture a selected window or monitor via xdg-desktop-portal (shows WM source-picker) |
-| `monitor` | Capture the focused monitor |
-| `all` | Capture all monitors |
-| `freeze` | Freeze screen and select interactively |
-| `generate-config` | Write a default config file |
+| Subcommand        | Description                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `crop`            | Select a region with slurp and capture it                                            |
+| `window`          | Capture the active window (geometry via Hyprland IPC)                                |
+| `portal`          | Capture a selected window or monitor via xdg-desktop-portal (shows WM source-picker) |
+| `monitor`         | Capture the focused monitor                                                          |
+| `all`             | Capture all monitors                                                                 |
+| `freeze`          | Freeze screen and select interactively                                               |
+| `generate-config` | Write a default config file                                                          |
 
 ### Global flag
 
@@ -73,7 +73,7 @@ crop-hypr [--config <FILE>] <SUBCOMMAND>
 Works with every subcommand, including `generate-config`.
 
 ```sh
-crop-hypr --config ~/.config/crop-hypr/work.toml freeze
+hyprcrop --config ~/.config/hyprcrop/work.toml freeze
 ```
 
 ### Freeze mode
@@ -82,13 +82,13 @@ Freeze mode overlays the screen and lets you switch capture type via a toolbar:
 
 ![bar-image](./bar.png)
 
-| Mode | Behaviour |
-| ---- | --------- |
-| Crop | Drag to draw a custom rectangle |
-| Window | Hover and click a window |
-| Monitor | Hover and click a monitor |
-| All | Capture everything instantly |
-| Close | Cancel (same as Escape) |
+| Mode    | Behaviour                       |
+| ------- | ------------------------------- |
+| Crop    | Drag to draw a custom rectangle |
+| Window  | Hover and click a window        |
+| Monitor | Hover and click a monitor       |
+| All     | Capture everything instantly    |
+| Close   | Cancel (same as Escape)         |
 
 Icon glyphs can be customized in the config file. Check the [configuration section](#configuration) for details.
 
@@ -98,23 +98,23 @@ Icon glyphs can be customized in the config file. Check the [configuration secti
 
 ```ini
 # ~/.config/hypr/hyprland.conf
-bindd = SUPER, S, ScreenshotMonitor,    exec, crop-hypr monitor
-bindd = SUPER SHIFT, S, FreezeMode,     exec, crop-hypr freeze
-bindd = , Print, ScreenshotFull,        exec, crop-hypr all
+bindd = SUPER, S, ScreenshotMonitor,    exec, hyprcrop monitor
+bindd = SUPER SHIFT, S, FreezeMode,     exec, hyprcrop freeze
+bindd = , Print, ScreenshotFull,        exec, hyprcrop all
 ```
 
 ## Configuration
 
-Config file location: `~/.config/crop-hypr/config.toml`
+Config file location: `~/.config/hyprcrop/config.toml`
 
 Generate a default config with:
 
 ```sh
-crop-hypr generate-config
+hyprcrop generate-config
 # Already exists? Use --force to overwrite:
-crop-hypr generate-config --force
+hyprcrop generate-config --force
 # Write to a custom path:
-crop-hypr --config ~/my-config.toml generate-config
+hyprcrop --config ~/my-config.toml generate-config
 ```
 
 ### Sample config
@@ -196,44 +196,44 @@ cancel  = "󰖭"
 
 ### Config reference
 
-| Key | Type | Default | Description |
-| --- | ---- | ------- | ----------- |
-| `save_path` | path | XDG Pictures dir + `/Screenshots` (fallback: `$HOME/Screenshots`) | Destination directory for saved screenshots |
-| `filename_pattern` | string | `hyprsnap_%Y%m%d_%H%M%S` | strftime pattern for filenames (no extension) |
-| `toolbar_position` | string | `top` | Freeze toolbar edge: `top`, `bottom`, `left`, or `right` |
-| `capture_window_border` | bool | `false` | Include Hyprland window border in window captures; also draws rounded highlights in freeze mode |
-| `freeze_glyphs.crop` | string | `󰆟` (U+F019F) | Toolbar icon for crop mode |
-| `freeze_glyphs.window` | string | `` (U+EB7F) | Toolbar icon for window mode |
-| `freeze_glyphs.monitor` | string | `󰍹` (U+F0379) | Toolbar icon for monitor mode |
-| `freeze_glyphs.all` | string | `󰁌` (U+F004C) | Toolbar icon for all-monitors mode |
-| `freeze_glyphs.cancel` | string | `󰖭` (U+F05AD) | Toolbar icon for cancel button |
-| `freeze_colors.overlay.background` | string (hex) | `"#00000059"` | Dim fill over frozen screen |
-| `freeze_colors.toolbar.background` | string (hex) | `"#141414D9"` | Toolbar pill background |
-| `freeze_colors.button.idle_background` | string (hex) | `"#797A7DFF"` | Mode button — unselected background |
-| `freeze_colors.button.idle_text` | string (hex) | `"#E6E6E6FF"` | Mode button — unselected text |
-| `freeze_colors.button.active_background` | string (hex) | `"#5865F2FF"` | Mode button — selected background |
-| `freeze_colors.button.active_text` | string (hex) | `"#FFFFFFFF"` | Mode button — selected text |
-| `freeze_colors.button.hover_background` | string (hex) | `"#6B79F5FF"` | Mode button — hover background |
-| `freeze_colors.button.hover_text` | string (hex) | `"#FFFFFFFF"` | Mode button — hover text |
-| `freeze_colors.cancel_button.idle_background` | string (hex) | `"#C3423FFF"` | Cancel button — normal background |
-| `freeze_colors.cancel_button.idle_text` | string (hex) | `"#FFFFFFFF"` | Cancel button — normal text |
-| `freeze_colors.cancel_button.hover_background` | string (hex) | `"#D44A47FF"` | Cancel button — hover background |
-| `freeze_colors.cancel_button.hover_text` | string (hex) | `"#FFFFFFFF"` | Cancel button — hover text |
-| `freeze_colors.window_frame.fill_idle` | string (hex) | `"#4585FF33"` | Window highlight fill (not hovered) |
-| `freeze_colors.window_frame.fill_hovered` | string (hex) | `"#4585FF8C"` | Window highlight fill (hovered) |
-| `freeze_colors.window_frame.stroke_idle` | string (hex) | `"#4D99FFB3"` | Window highlight outline (not hovered) |
-| `freeze_colors.window_frame.stroke_hovered` | string (hex) | `"#4D99FFFF"` | Window highlight outline (hovered) |
-| `freeze_colors.window_frame.label_text` | string (hex) | `"#FFFFFFFF"` | Window title text (hovered) |
-| `freeze_colors.window_frame.hint_text` | string (hex) | `"#CCE6FFE6"` | "Click to capture" hint (hovered) |
-| `freeze_colors.monitor_frame.fill_idle` | string (hex) | `"#4585FF14"` | Monitor highlight fill (not hovered) |
-| `freeze_colors.monitor_frame.fill_hovered` | string (hex) | `"#4585FF66"` | Monitor highlight fill (hovered) |
-| `freeze_colors.monitor_frame.stroke_idle` | string (hex) | `"#4D99FF59"` | Monitor highlight outline (not hovered) |
-| `freeze_colors.monitor_frame.stroke_hovered` | string (hex) | `"#4D99FFFF"` | Monitor highlight outline (hovered) |
-| `freeze_colors.monitor_frame.label_text` | string (hex) | `"#FFFFFFFF"` | Monitor name text (hovered) |
-| `freeze_colors.monitor_frame.hint_text` | string (hex) | `"#CCE6FFE6"` | "Click to capture" hint (hovered) |
-| `freeze_colors.monitor_frame.name_text_idle` | string (hex) | `"#FFFFFF80"` | Monitor name text (not hovered) |
-| `freeze_colors.crop_frame.stroke` | string (hex) | `"#FFFFFFFF"` | Crop rubber-band outline |
-| `freeze_colors.crop_frame.label_text` | string (hex) | `"#FFFFFFFF"` | "W × H" size label in crop mode |
+| Key                                            | Type         | Default                                                           | Description                                                                                     |
+| ---------------------------------------------- | ------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `save_path`                                    | path         | XDG Pictures dir + `/Screenshots` (fallback: `$HOME/Screenshots`) | Destination directory for saved screenshots                                                     |
+| `filename_pattern`                             | string       | `hyprsnap_%Y%m%d_%H%M%S`                                          | strftime pattern for filenames (no extension)                                                   |
+| `toolbar_position`                             | string       | `top`                                                             | Freeze toolbar edge: `top`, `bottom`, `left`, or `right`                                        |
+| `capture_window_border`                        | bool         | `false`                                                           | Include Hyprland window border in window captures; also draws rounded highlights in freeze mode |
+| `freeze_glyphs.crop`                           | string       | `󰆟` (U+F019F)                                                     | Toolbar icon for crop mode                                                                      |
+| `freeze_glyphs.window`                         | string       | `` (U+EB7F)                                                      | Toolbar icon for window mode                                                                    |
+| `freeze_glyphs.monitor`                        | string       | `󰍹` (U+F0379)                                                     | Toolbar icon for monitor mode                                                                   |
+| `freeze_glyphs.all`                            | string       | `󰁌` (U+F004C)                                                     | Toolbar icon for all-monitors mode                                                              |
+| `freeze_glyphs.cancel`                         | string       | `󰖭` (U+F05AD)                                                     | Toolbar icon for cancel button                                                                  |
+| `freeze_colors.overlay.background`             | string (hex) | `"#00000059"`                                                     | Dim fill over frozen screen                                                                     |
+| `freeze_colors.toolbar.background`             | string (hex) | `"#141414D9"`                                                     | Toolbar pill background                                                                         |
+| `freeze_colors.button.idle_background`         | string (hex) | `"#797A7DFF"`                                                     | Mode button — unselected background                                                             |
+| `freeze_colors.button.idle_text`               | string (hex) | `"#E6E6E6FF"`                                                     | Mode button — unselected text                                                                   |
+| `freeze_colors.button.active_background`       | string (hex) | `"#5865F2FF"`                                                     | Mode button — selected background                                                               |
+| `freeze_colors.button.active_text`             | string (hex) | `"#FFFFFFFF"`                                                     | Mode button — selected text                                                                     |
+| `freeze_colors.button.hover_background`        | string (hex) | `"#6B79F5FF"`                                                     | Mode button — hover background                                                                  |
+| `freeze_colors.button.hover_text`              | string (hex) | `"#FFFFFFFF"`                                                     | Mode button — hover text                                                                        |
+| `freeze_colors.cancel_button.idle_background`  | string (hex) | `"#C3423FFF"`                                                     | Cancel button — normal background                                                               |
+| `freeze_colors.cancel_button.idle_text`        | string (hex) | `"#FFFFFFFF"`                                                     | Cancel button — normal text                                                                     |
+| `freeze_colors.cancel_button.hover_background` | string (hex) | `"#D44A47FF"`                                                     | Cancel button — hover background                                                                |
+| `freeze_colors.cancel_button.hover_text`       | string (hex) | `"#FFFFFFFF"`                                                     | Cancel button — hover text                                                                      |
+| `freeze_colors.window_frame.fill_idle`         | string (hex) | `"#4585FF33"`                                                     | Window highlight fill (not hovered)                                                             |
+| `freeze_colors.window_frame.fill_hovered`      | string (hex) | `"#4585FF8C"`                                                     | Window highlight fill (hovered)                                                                 |
+| `freeze_colors.window_frame.stroke_idle`       | string (hex) | `"#4D99FFB3"`                                                     | Window highlight outline (not hovered)                                                          |
+| `freeze_colors.window_frame.stroke_hovered`    | string (hex) | `"#4D99FFFF"`                                                     | Window highlight outline (hovered)                                                              |
+| `freeze_colors.window_frame.label_text`        | string (hex) | `"#FFFFFFFF"`                                                     | Window title text (hovered)                                                                     |
+| `freeze_colors.window_frame.hint_text`         | string (hex) | `"#CCE6FFE6"`                                                     | "Click to capture" hint (hovered)                                                               |
+| `freeze_colors.monitor_frame.fill_idle`        | string (hex) | `"#4585FF14"`                                                     | Monitor highlight fill (not hovered)                                                            |
+| `freeze_colors.monitor_frame.fill_hovered`     | string (hex) | `"#4585FF66"`                                                     | Monitor highlight fill (hovered)                                                                |
+| `freeze_colors.monitor_frame.stroke_idle`      | string (hex) | `"#4D99FF59"`                                                     | Monitor highlight outline (not hovered)                                                         |
+| `freeze_colors.monitor_frame.stroke_hovered`   | string (hex) | `"#4D99FFFF"`                                                     | Monitor highlight outline (hovered)                                                             |
+| `freeze_colors.monitor_frame.label_text`       | string (hex) | `"#FFFFFFFF"`                                                     | Monitor name text (hovered)                                                                     |
+| `freeze_colors.monitor_frame.hint_text`        | string (hex) | `"#CCE6FFE6"`                                                     | "Click to capture" hint (hovered)                                                               |
+| `freeze_colors.monitor_frame.name_text_idle`   | string (hex) | `"#FFFFFF80"`                                                     | Monitor name text (not hovered)                                                                 |
+| `freeze_colors.crop_frame.stroke`              | string (hex) | `"#FFFFFFFF"`                                                     | Crop rubber-band outline                                                                        |
+| `freeze_colors.crop_frame.label_text`          | string (hex) | `"#FFFFFFFF"`                                                     | "W × H" size label in crop mode                                                                 |
 
 ## License
 

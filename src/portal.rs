@@ -133,7 +133,7 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
 
     let stream = pw::stream::StreamRc::new(
         core,
-        "crop-hypr-capture",
+        "hyprcrop-capture",
         properties! {
             *pw::keys::MEDIA_TYPE => "Video",
             *pw::keys::MEDIA_CATEGORY => "Capture",

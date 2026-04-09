@@ -128,13 +128,13 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Load config from the default path (`~/.config/crop-hypr/config.toml`).
+    /// Load config from the default path (`~/.config/hyprcrop/config.toml`).
     /// Falls back to defaults if the file does not exist.
     pub fn load() -> Result<Self> {
         Self::load_from(&Self::default_config_path())
     }
 
-    /// Returns the default config file path (`~/.config/crop-hypr/config.toml`).
+    /// Returns the default config file path (`~/.config/hyprcrop/config.toml`).
     pub fn default_config_path() -> PathBuf {
         default_config_path()
     }
@@ -187,7 +187,7 @@ impl Config {
 fn default_config_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("crop-hypr")
+        .join("hyprcrop")
         .join("config.toml")
 }
 

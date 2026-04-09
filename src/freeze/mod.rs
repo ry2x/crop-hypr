@@ -38,7 +38,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         .join()
         .expect("layers thread panicked")
         .unwrap_or_else(|e| {
-            eprintln!("[crop-hypr] warning: failed to fetch overlay layers: {e}");
+            eprintln!("[hyprcrop] warning: failed to fetch overlay layers: {e}");
             Vec::new()
         });
 
@@ -91,7 +91,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     exclusive_zone: Some(-1),
                     keyboard_interactivity: KeyboardInteractivity::Exclusive,
                     output_option: OutputOption::OutputName(m.name.clone()),
-                    namespace: Some("crop-hypr-freeze".to_string()),
+                    namespace: Some("hyprcrop-freeze".to_string()),
                     ..Default::default()
                 };
                 (id, settings)
@@ -135,7 +135,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                 });
                 (state, Task::batch(spawn_tasks))
             },
-            "crop-hypr-freeze",
+            "hyprcrop-freeze",
             app_update,
             app_view,
         )

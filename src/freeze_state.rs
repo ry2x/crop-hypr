@@ -2,10 +2,10 @@ use std::{fs, path::PathBuf};
 
 use crate::freeze::CaptureMode;
 
-/// Returns `$XDG_STATE_HOME/crop-hypr/last_mode`
-/// (falls back to `~/.local/state/crop-hypr/last_mode`).
+/// Returns `$XDG_STATE_HOME/hyprcrop/last_mode`
+/// (falls back to `~/.local/state/hyprcrop/last_mode`).
 fn state_file() -> Option<PathBuf> {
-    dirs::state_dir().map(|d| d.join("crop-hypr").join("last_mode"))
+    dirs::state_dir().map(|d| d.join("hyprcrop").join("last_mode"))
 }
 
 fn mode_to_str(mode: CaptureMode) -> &'static str {
@@ -69,7 +69,7 @@ mod tests {
 
     fn tmp_state_file() -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().expect("tempdir");
-        let path = tmp.path().join("crop-hypr").join("last_mode");
+        let path = tmp.path().join("hyprcrop").join("last_mode");
         (tmp, path)
     }
 

@@ -1,14 +1,14 @@
 [package]
-name = "crop-hypr"
-version = "0.4.1"
+name = "hyprcrop"
+version = "0.4.2"
 edition = "2024"
 authors = ["ry2x"]
 description = "A fast, Hyprland-native screenshot tool written in Rust."
 readme = "README.md"
-repository = "https://github.com/ry2x/crop-hypr"
+repository = "https://github.com/ry2x/hyprcrop"
 
 [[bin]]
-name = "crop-hypr"
+name = "hyprcrop"
 path = "src/main.rs"
 
 [dependencies]

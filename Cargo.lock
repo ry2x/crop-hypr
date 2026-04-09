@@ -809,31 +809,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crop-hypr"
-version = "0.4.1"
-dependencies = [
- "ashpd",
- "chrono",
- "clap",
- "dirs",
- "iced",
- "iced_layershell",
- "image",
- "memmap2",
- "nix 0.29.0",
- "pipewire",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "toml 0.8.23",
- "wayland-client",
- "wayland-protocols",
- "wayland-protocols-wlr",
-]
-
-[[package]]
 name = "crossbeam-deque"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1577,6 +1552,31 @@ name = "hexf-parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
+
+[[package]]
+name = "hyprcrop"
+version = "0.4.2"
+dependencies = [
+ "ashpd",
+ "chrono",
+ "clap",
+ "dirs",
+ "iced",
+ "iced_layershell",
+ "image",
+ "memmap2",
+ "nix 0.29.0",
+ "pipewire",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
+ "wayland-client",
+ "wayland-protocols",
+ "wayland-protocols-wlr",
+]
 
 [[package]]
 name = "iana-time-zone"
