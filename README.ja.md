@@ -1,6 +1,6 @@
-# hyprcrop
+# HyprCrop
 
-Hyprland向けに作られた、高速なRust製スクリーンショットツール。
+Hyprland向けに作られた、高速なRust製スクリーンショットツールです。
 
 ## 特徴
 

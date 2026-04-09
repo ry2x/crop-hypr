@@ -1,4 +1,4 @@
-# hyprcrop
+# HyprCrop
 
 A fast, Hyprland-native screenshot tool written in Rust.
 
