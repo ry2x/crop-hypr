@@ -180,6 +180,9 @@ pub struct LayerSurface {
     pub namespace: String,
 }
 
+/// Hyprland layer level for overlay surfaces (above all windows).
+const OVERLAY_LEVEL: &str = "3";
+
 /// Fetch all overlay-level (level 3) layer surfaces from Hyprland IPC.
 pub fn get_overlay_layers() -> Result<Vec<LayerSurface>> {
     let monitors: HashMap<String, HyprLayerMonitor> = hyprland_ipc("layers")?;
@@ -188,7 +191,7 @@ pub fn get_overlay_layers() -> Result<Vec<LayerSurface>> {
         .flat_map(|mon| {
             mon.levels
                 .into_iter()
-                .filter(|(level, _)| level == "3")
+                .filter(|(level, _)| level == OVERLAY_LEVEL)
                 .flat_map(|(_, surfaces)| surfaces)
                 .map(|s| LayerSurface {
                     rect: ScreenRect {

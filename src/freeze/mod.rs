@@ -37,7 +37,10 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let layers = layers_t
         .join()
         .expect("layers thread panicked")
-        .unwrap_or_default();
+        .unwrap_or_else(|e| {
+            eprintln!("[crop-hypr] warning: failed to fetch overlay layers: {e}");
+            Vec::new()
+        });
 
     let monitors = hyprland::parse_monitors(monitors_raw);
     let active_ws_ids: Vec<i64> = monitors.iter().map(|m| m.active_workspace_id).collect();

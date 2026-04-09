@@ -52,6 +52,7 @@ pub enum CaptureMode {
 pub enum HoveredTarget {
     Window(usize),
     Layer(usize),
+    Monitor(usize),
 }
 
 // ── Canvas program (owns its data, no lifetime on AppState) ───────────────────
@@ -129,7 +130,7 @@ impl canvas::Program<Message> for SelectionCanvas {
                             }
                             CaptureMode::Monitor => {
                                 hit_index_m(&self.monitors, pos, self.monitor_offset)
-                                    .map(HoveredTarget::Window)
+                                    .map(HoveredTarget::Monitor)
                             }
                             _ => None,
                         };
@@ -171,9 +172,10 @@ impl canvas::Program<Message> for SelectionCanvas {
                             );
                         }
                         None => {}
+                        Some(HoveredTarget::Monitor(_)) => {}
                     },
                     CaptureMode::Monitor => {
-                        if let Some(HoveredTarget::Window(idx)) = state.hovered {
+                        if let Some(HoveredTarget::Monitor(idx)) = state.hovered {
                             let rect = self.monitors[idx].rect;
                             return Some(
                                 canvas::Action::publish(Message::SelectionConfirmed(rect))
@@ -263,7 +265,7 @@ impl canvas::Program<Message> for SelectionCanvas {
                     draw_monitor_highlight(
                         &mut frame,
                         mon.rect,
-                        state.hovered == Some(HoveredTarget::Window(i)),
+                        state.hovered == Some(HoveredTarget::Monitor(i)),
                         &mon.name,
                         self.monitor_offset,
                         &self.colors.monitor_frame,
