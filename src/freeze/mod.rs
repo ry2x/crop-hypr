@@ -24,6 +24,7 @@ use crate::screencopy;
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
     let clients_t = std::thread::spawn(hyprland::get_clients);
+    let layers_t = std::thread::spawn(hyprland::get_overlay_layers);
     let border_style = if cfg.capture_window_border {
         hyprland::get_border_style()
     } else {
@@ -33,6 +34,13 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
 
     let monitors_raw = monitors_t.join().expect("monitors thread panicked")?;
     let clients_raw = clients_t.join().expect("clients thread panicked")?;
+    let layers = layers_t
+        .join()
+        .expect("layers thread panicked")
+        .unwrap_or_else(|e| {
+            eprintln!("[crop-hypr] warning: failed to fetch overlay layers: {e}");
+            Vec::new()
+        });
 
     let monitors = hyprland::parse_monitors(monitors_raw);
     let active_ws_ids: Vec<i64> = monitors.iter().map(|m| m.active_workspace_id).collect();
@@ -94,6 +102,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
 
         let wins = Arc::new(windows);
         let mons = Arc::new(monitors);
+        let lyrs = Arc::new(layers);
         let glyphs = cfg.freeze_glyphs.clone();
         let toolbar_position = cfg.toolbar_position;
         let colors = cfg.freeze_colors;
@@ -116,6 +125,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     window_to_monitor: window_to_monitor.clone(),
                     windows: Arc::clone(&wins),
                     monitors: Arc::clone(&mons),
+                    layers: Arc::clone(&lyrs),
                     result: result_clone.clone(),
                     glyphs: glyphs.clone(),
                     toolbar_position,
