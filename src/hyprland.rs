@@ -169,7 +169,7 @@ struct HyprLayerSurface {
 }
 
 #[derive(Deserialize, Debug)]
-struct HyprLayerMonitor {
+pub(crate) struct HyprLayerMonitor {
     levels: HashMap<String, Vec<HyprLayerSurface>>,
 }
 
@@ -183,10 +183,14 @@ pub struct LayerSurface {
 /// Hyprland layer level for overlay surfaces (above all windows).
 const OVERLAY_LEVEL: &str = "3";
 
-/// Fetch all overlay-level (level 3) layer surfaces from Hyprland IPC.
-pub fn get_overlay_layers() -> Result<Vec<LayerSurface>> {
-    let monitors: HashMap<String, HyprLayerMonitor> = hyprland_ipc("layers")?;
-    let surfaces = monitors
+/// Parse overlay-level surfaces from a `hyprctl -j layers` response.
+///
+/// Surfaces are returned sorted by (x, y, namespace) for deterministic ordering,
+/// since `HashMap` iteration order is nondeterministic.
+pub(crate) fn parse_overlay_layers(
+    monitors: HashMap<String, HyprLayerMonitor>,
+) -> Vec<LayerSurface> {
+    let mut surfaces: Vec<LayerSurface> = monitors
         .into_values()
         .flat_map(|mon| {
             mon.levels
@@ -202,11 +206,23 @@ pub fn get_overlay_layers() -> Result<Vec<LayerSurface>> {
                     },
                     namespace: s.namespace,
                 })
-                .collect::<Vec<_>>()
         })
         .filter(|s| s.rect.w > 0 && s.rect.h > 0)
         .collect();
-    Ok(surfaces)
+    surfaces.sort_by(|a, b| {
+        a.rect
+            .x
+            .cmp(&b.rect.x)
+            .then(a.rect.y.cmp(&b.rect.y))
+            .then(a.namespace.cmp(&b.namespace))
+    });
+    surfaces
+}
+
+/// Fetch all overlay-level (level 3) layer surfaces from Hyprland IPC.
+pub fn get_overlay_layers() -> Result<Vec<LayerSurface>> {
+    let monitors: HashMap<String, HyprLayerMonitor> = hyprland_ipc("layers")?;
+    Ok(parse_overlay_layers(monitors))
 }
 
 pub fn parse_monitors(monitors: Vec<HyprMonitor>) -> Vec<MonitorInfo> {
@@ -281,6 +297,39 @@ mod tests {
         assert_eq!(parsed[0].rect.w, 1920);
         assert!(parsed[0].focused);
         assert_eq!(parsed[0].active_workspace_id, 1);
+    }
+
+    #[test]
+    fn test_overlay_layer_parsing() {
+        // Representative `hyprctl -j layers` payload with multiple monitors and levels.
+        let json = r#"{
+            "DP-2": {
+                "levels": {
+                    "0": [{"x":0,"y":1050,"w":1920,"h":30,"namespace":"waybar-bottom"}],
+                    "3": [{"x":0,"y":0,"w":1920,"h":30,"namespace":"waybar"}]
+                }
+            },
+            "DP-1": {
+                "levels": {
+                    "3": [
+                        {"x":1920,"y":0,"w":2560,"h":40,"namespace":"waybar"},
+                        {"x":0,"y":0,"w":0,"h":0,"namespace":"zero-size"}
+                    ]
+                }
+            }
+        }"#;
+        let monitors: HashMap<String, HyprLayerMonitor> = serde_json::from_str(json).unwrap();
+        let surfaces = parse_overlay_layers(monitors);
+
+        // zero-size surface and level-0 surface must be filtered out
+        assert_eq!(surfaces.len(), 2);
+        // sorted by (x, y, namespace): x=0 first, then x=1920
+        assert_eq!(surfaces[0].namespace, "waybar");
+        assert_eq!(surfaces[0].rect.x, 0);
+        assert_eq!(surfaces[0].rect.w, 1920);
+        assert_eq!(surfaces[1].namespace, "waybar");
+        assert_eq!(surfaces[1].rect.x, 1920);
+        assert_eq!(surfaces[1].rect.w, 2560);
     }
 
     #[test]
