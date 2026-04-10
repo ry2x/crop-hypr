@@ -32,11 +32,18 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     };
     let initial_mode = freeze_state::load_last_mode();
 
-    let monitors_raw = monitors_t.join().expect("monitors thread panicked")?;
-    let clients_raw = clients_t.join().expect("clients thread panicked")?;
+    let monitors_raw = monitors_t
+        .join()
+        .map_err(|_| AppError::Other("monitors thread panicked".into()))??;
+    let clients_raw = clients_t
+        .join()
+        .map_err(|_| AppError::Other("clients thread panicked".into()))??;
     let layers = layers_t
         .join()
-        .expect("layers thread panicked")
+        .unwrap_or_else(|_| {
+            eprintln!("[hyprcrop] warning: overlay layers thread panicked");
+            Ok(Vec::new())
+        })
         .unwrap_or_else(|e| {
             eprintln!("[hyprcrop] warning: failed to fetch overlay layers: {e}");
             Vec::new()

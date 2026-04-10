@@ -361,7 +361,7 @@ impl AppState {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ModeSelected(CaptureMode::All) => {
-                *self.result.lock().unwrap() = Some(None);
+                *self.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(None);
                 return iced::exit();
             }
             Message::ModeSelected(mode) => {
@@ -369,7 +369,7 @@ impl AppState {
                 freeze_state::save_last_mode(mode);
             }
             Message::SelectionConfirmed(rect) => {
-                *self.result.lock().unwrap() = Some(Some(rect));
+                *self.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(Some(rect));
                 return iced::exit();
             }
             Message::Cancel => {
@@ -780,8 +780,8 @@ fn points_to_rect(a: Point, b: Point) -> ScreenRect {
     ScreenRect {
         x: a.x.min(b.x) as i32,
         y: a.y.min(b.y) as i32,
-        w: (a.x - b.x).abs() as i32,
-        h: (a.y - b.y).abs() as i32,
+        w: (a.x - b.x).abs().min(i32::MAX as f32) as i32,
+        h: (a.y - b.y).abs().min(i32::MAX as f32) as i32,
     }
 }
 
@@ -804,9 +804,9 @@ fn hit_index(
         .filter(|(_, w)| {
             let r = w.rect.expand(border_size);
             gx >= r.x as f32
-                && gx <= (r.x + r.w) as f32
+                && gx < (r.x + r.w) as f32
                 && gy >= r.y as f32
-                && gy <= (r.y + r.h) as f32
+                && gy < (r.y + r.h) as f32
         })
         .min_by_key(|(_, w)| (!w.floating, w.focus_history_id))
         .map(|(i, _)| i)

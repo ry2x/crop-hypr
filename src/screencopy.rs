@@ -721,30 +721,18 @@ pub fn capture_all_monitors_with_physical(
         let log_w = log_w as u32;
         let log_h = log_h as u32;
 
-        // Pre-compute the logical→physical index mapping for each axis.
-        // Use u64 intermediate to avoid u32 overflow when logical * physical dimensions
-        // exceed 4 GiB (possible on large multi-monitor HiDPI setups).
-        let phys_xs: Vec<u32> = (0..log_w)
-            .map(|lx| {
-                ((lx as u64 * fi.width as u64 / log_w as u64) as u32)
-                    .min(fi.width.saturating_sub(1))
-            })
-            .collect();
-        let phys_ys: Vec<u32> = (0..log_h)
-            .map(|ly| {
-                ((ly as u64 * fi.height as u64 / log_h as u64) as u32)
-                    .min(fi.height.saturating_sub(1))
-            })
-            .collect();
-
-        for (ly, &py) in phys_ys.iter().enumerate() {
-            for (lx, &px) in phys_xs.iter().enumerate() {
-                // Compute offset in usize to avoid u32 overflow on large physical buffers.
+        // Map each logical pixel to its corresponding physical pixel using u64
+        // intermediate arithmetic to avoid u32 overflow on large HiDPI setups.
+        for ly in 0..log_h {
+            let py = ((ly as u64 * fi.height as u64 / log_h as u64) as u32)
+                .min(fi.height.saturating_sub(1));
+            for lx in 0..log_w {
+                let px = ((lx as u64 * fi.width as u64 / log_w as u64) as u32)
+                    .min(fi.width.saturating_sub(1));
                 let offset = py as usize * fi.stride as usize + px as usize * 4;
-                // lx < log_w (u32) and ly < log_h (u32), so usize → u32 never truncates.
                 master_img.put_pixel(
-                    offset_x + lx as u32,
-                    offset_y + ly as u32,
+                    offset_x + lx,
+                    offset_y + ly,
                     read_pixel_rgba(mmap, offset, format),
                 );
             }

@@ -203,13 +203,33 @@ fn expand_tilde(path: &std::path::Path) -> PathBuf {
         path.to_path_buf()
     };
 
-    if expanded.is_absolute() {
+    let resolved = if expanded.is_absolute() {
         expanded
     } else {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(expanded)
+    };
+
+    // Normalize away any `..` components so that e.g. `~/foo/../../etc`
+    // does not silently escape the user's home directory.
+    normalize_path(resolved)
+}
+
+/// Resolve `.` and `..` components without touching the filesystem.
+fn normalize_path(path: PathBuf) -> PathBuf {
+    use std::path::Component;
+    let mut out: Vec<std::ffi::OsString> = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::CurDir => {}
+            c => out.push(c.as_os_str().to_owned()),
+        }
     }
+    out.iter().collect()
 }
 
 #[cfg(test)]

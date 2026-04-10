@@ -5,7 +5,7 @@ use crate::error::Result;
 
 pub fn notify_success(path: &Path) {
     let path_str = path.display().to_string();
-    let _ = run_cmd_status(
+    if let Err(e) = run_cmd_status(
         CMD_NOTIFY_SEND,
         [
             "--app-name=hyprcrop",
@@ -13,7 +13,9 @@ pub fn notify_success(path: &Path) {
             "Screenshot saved",
             &path_str,
         ],
-    );
+    ) {
+        eprintln!("[hyprcrop] warning: failed to send notification: {e}");
+    }
 }
 
 pub fn notify_error(msg: &str) -> Result<()> {
