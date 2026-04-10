@@ -1,6 +1,6 @@
 [submodule "PKGBUILD/hyprcrop"]
 	path = PKGBUILD/hyprcrop
-	url = https://aur.archlinux.org/hyprcrop.git
+	url = ssh://aur@aur.archlinux.org/hyprcrop.git
 [submodule "PKGBUILD/hyprcrop-bin"]
 	path = PKGBUILD/hyprcrop-bin
 	url = ssh://aur@aur.archlinux.org/hyprcrop-bin.git
