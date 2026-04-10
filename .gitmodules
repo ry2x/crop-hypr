@@ -3,4 +3,4 @@
 	url = https://aur.archlinux.org/hyprcrop.git
 [submodule "PKGBUILD/hyprcrop-bin"]
 	path = PKGBUILD/hyprcrop-bin
-	url = https://aur.archlinux.org/hyprcrop-bin.git
+	url = ssh://aur@aur.archlinux.org/hyprcrop-bin.git
