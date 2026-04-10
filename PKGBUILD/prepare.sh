@@ -38,11 +38,20 @@ validate_version() {
 	fi
 }
 
+escape_sed_replacement() {
+	printf '%s\n' "$1" | sed 's/[\/&|\\]/\\&/g'
+}
+
 update_pkgbuild_files() {
 	local module_path=$1
+	local version=$2
+	local escaped_version
+
+	escaped_version=$(escape_sed_replacement "$version")
 
 	pushd "$ROOT_DIR/$module_path" >/dev/null
-	sed -i "s/pkgver=.*/pkgver=$VERSION/" PKGBUILD
+	sed -i "s|^pkgver=.*|pkgver=$escaped_version|" PKGBUILD
+	sed -i "s|^pkgrel=.*|pkgrel=1|" PKGBUILD
 	updpkgsums
 	makepkg --printsrcinfo > .SRCINFO
 	popd >/dev/null
@@ -50,13 +59,15 @@ update_pkgbuild_files() {
 
 commit_and_push_submodule() {
 	local module_path=$1
+	local version=$2
 
 	pushd "$ROOT_DIR/$module_path" >/dev/null
+	git checkout master
 	git add PKGBUILD .SRCINFO
 
 	if ! git diff --cached --quiet; then
-		git commit -m "Update to version $VERSION"
-		git push
+		git commit -m "Update to version $version"
+		git push origin master
 	else
 		echo "No changes to commit in $module_path"
 	fi
@@ -65,11 +76,13 @@ commit_and_push_submodule() {
 }
 
 commit_and_push_main_repo() {
+	local version=$1
+
 	pushd "$ROOT_DIR" >/dev/null
-	git add PKGBUILD
+	git add "${SUBMODULE_DIRS[@]}"
 
 	if ! git diff --cached --quiet; then
-		git commit -m "🧹 CHORE: Update PKGBUILD submodules to version $VERSION"
+		git commit -m "🧹 CHORE: Update PKGBUILD submodules to version $version"
 		git push
 	else
 		echo "No changes to commit in main repository"
@@ -81,21 +94,22 @@ commit_and_push_main_repo() {
 main() {
 	require_commands
 
-	VERSION=$(read_version "${1:-}")
-	validate_version "$VERSION"
+	local version
+	version=$(read_version "${1:-}")
+	validate_version "$version"
 
 	git -C "$ROOT_DIR" submodule update --init --recursive
 
 	local module
 	for module in "${SUBMODULE_DIRS[@]}"; do
-		update_pkgbuild_files "$module"
+		update_pkgbuild_files "$module" "$version"
 	done
 
 	for module in "${SUBMODULE_DIRS[@]}"; do
-		commit_and_push_submodule "$module"
+		commit_and_push_submodule "$module" "$version"
 	done
 
-	commit_and_push_main_repo
+	commit_and_push_main_repo "$version"
 }
 
 main "${1:-}"
