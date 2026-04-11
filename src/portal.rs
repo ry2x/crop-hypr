@@ -218,7 +218,12 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
 
                     // spa_data.fd == -1 means no fd is set; constructing a
                     // BorrowedFd from -1 is immediate UB at the Rust level.
+                    // Additionally verify the fd is actually open before
+                    // borrowing it, guarding against stale descriptors.
                     if raw_fd < 0 {
+                        None
+                    } else if nix::fcntl::fcntl(raw_fd, nix::fcntl::FcntlArg::F_GETFD).is_err() {
+                        eprintln!("[hyprcrop] warning: memfd descriptor {raw_fd} is invalid, skipping frame");
                         None
                     } else {
                         NonZeroUsize::new(map_size.max(1)).and_then(|len| {
@@ -245,7 +250,9 @@ fn pipewire_capture(node_id: u32, fd: OwnedFd) -> Result<RgbaImage> {
                             let w = ud.format.size().width;
                             let h = ud.format.size().height;
                             let img = decode_frame(frame, w, h, stride as u32, ud.format.format());
-                            let _ = unsafe { nix::sys::mman::munmap(ptr, len.get()) };
+                            if let Err(e) = unsafe { nix::sys::mman::munmap(ptr, len.get()) } {
+                                eprintln!("[hyprcrop] warning: munmap failed: {e}");
+                            }
                             img
                         })
                     }

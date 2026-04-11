@@ -724,6 +724,7 @@ pub fn capture_all_monitors_with_physical(
         // Pre-compute the logical→physical index mapping for each axis.
         // Use u64 intermediate to avoid u32 overflow when logical * physical dimensions
         // exceed 4 GiB (possible on large multi-monitor HiDPI setups).
+        // Pre-computing avoids repeating the division for every pixel in the hot loop.
         let phys_xs: Vec<u32> = (0..log_w)
             .map(|lx| {
                 ((lx as u64 * fi.width as u64 / log_w as u64) as u32)

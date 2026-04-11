@@ -115,6 +115,11 @@ pub fn capture_crop(cfg: &Config) -> Result<PathBuf> {
     let min_y = monitors.iter().map(|m| m.rect.y).min().unwrap_or(0);
     let x = (slurp_x - min_x).max(0) as u32;
     let y = (slurp_y - min_y).max(0) as u32;
+    if slurp_x < min_x || slurp_y < min_y {
+        eprintln!(
+            "warning: crop origin ({slurp_x},{slurp_y}) is before monitor origin ({min_x},{min_y}), clamped to ({x},{y})"
+        );
+    }
 
     let full_img = screencopy::capture_all_monitors(&monitors)?;
 

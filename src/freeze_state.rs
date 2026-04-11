@@ -22,7 +22,9 @@ fn str_to_mode(s: &str) -> Option<CaptureMode> {
         "crop" => Some(CaptureMode::Crop),
         "window" => Some(CaptureMode::Window),
         "monitor" => Some(CaptureMode::Monitor),
-        "all" => None,
+        // "all" is never written by save_last_mode, but if it appears (e.g.
+        // from a manual edit) treat it like an unrecognised value and fall
+        // back to the default (Crop) via the None → unwrap_or chain in read_mode.
         _ => None,
     }
 }
