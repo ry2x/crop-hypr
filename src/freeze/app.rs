@@ -780,8 +780,19 @@ fn points_to_rect(a: Point, b: Point) -> ScreenRect {
     ScreenRect {
         x: a.x.min(b.x) as i32,
         y: a.y.min(b.y) as i32,
-        w: (a.x - b.x).abs().min(i32::MAX as f32) as i32,
-        h: (a.y - b.y).abs().min(i32::MAX as f32) as i32,
+        w: finite_abs_to_i32(a.x - b.x),
+        h: finite_abs_to_i32(a.y - b.y),
+    }
+}
+
+/// Convert a f32 difference to a non-negative i32 dimension.
+/// Returns 0 for NaN/infinite values rather than producing garbage via `as`.
+#[inline]
+fn finite_abs_to_i32(v: f32) -> i32 {
+    if v.is_finite() {
+        v.abs().clamp(0.0, i32::MAX as f32) as i32
+    } else {
+        0
     }
 }
 

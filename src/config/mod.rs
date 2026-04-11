@@ -193,43 +193,79 @@ fn default_config_path() -> PathBuf {
 
 fn expand_tilde(path: &std::path::Path) -> PathBuf {
     let s = path.to_string_lossy();
-    let expanded = if let Some(stripped) = s.strip_prefix("~/") {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(stripped)
+    let (expanded, from_tilde_or_relative) = if let Some(stripped) = s.strip_prefix("~/") {
+        (
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(stripped),
+            true,
+        )
     } else if s == "~" {
-        dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
+        (
+            dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")),
+            true,
+        )
     } else {
-        path.to_path_buf()
+        (path.to_path_buf(), false)
     };
 
     let resolved = if expanded.is_absolute() {
         expanded
     } else {
+        // Relative paths are anchored to home.
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(expanded)
     };
 
-    // Normalize away any `..` components so that e.g. `~/foo/../../etc`
-    // does not silently escape the user's home directory.
-    normalize_path(resolved)
-}
+    let normalized = normalize_path(resolved);
 
-/// Resolve `.` and `..` components without touching the filesystem.
-fn normalize_path(path: PathBuf) -> PathBuf {
-    use std::path::Component;
-    let mut out: Vec<std::ffi::OsString> = Vec::new();
-    for component in path.components() {
-        match component {
-            Component::ParentDir => {
-                out.pop();
+    // For tilde-expanded or relative paths, guard against `..` traversal
+    // that escapes the home directory (e.g. `~/foo/../../etc`).
+    // Explicit absolute paths (e.g. `/tmp/screenshots`) are passed through as-is.
+    if from_tilde_or_relative || !path.is_absolute() {
+        if let Some(home) = dirs::home_dir() {
+            if !normalized.starts_with(&home) {
+                eprintln!(
+                    "[hyprcrop] warning: save_path '{}' resolves outside home directory, falling back to ~/Screenshots",
+                    path.display()
+                );
+                return home.join("Screenshots");
             }
-            Component::CurDir => {}
-            c => out.push(c.as_os_str().to_owned()),
         }
     }
-    out.iter().collect()
+
+    normalized
+}
+
+/// Resolve `.` and `..` path components without touching the filesystem.
+///
+/// Correctly preserves Prefix/RootDir anchors so that e.g. `/../etc` stays
+/// as `/etc` (not a relative `etc`). Leading `..` on relative paths are kept
+/// as-is (they cannot be resolved without a base).
+fn normalize_path(path: PathBuf) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => out.push(prefix.as_os_str()),
+            Component::RootDir => out.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::Normal(part) => out.push(part),
+            Component::ParentDir => {
+                let last_is_normal =
+                    matches!(out.components().next_back(), Some(Component::Normal(_)));
+                if last_is_normal {
+                    out.pop();
+                } else if !out.has_root() {
+                    // Keep leading `..` on relative paths.
+                    out.push(component.as_os_str());
+                }
+                // For absolute paths at root, `..` is a no-op (silently dropped).
+            }
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -440,6 +476,52 @@ cancel = "Z"
         assert_eq!(
             expand_tilde(&PathBuf::from("Screenshots")),
             home.join("Screenshots")
+        );
+    }
+
+    // ── normalize_path ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_normalize_path_dotdot_collapses_normal() {
+        assert_eq!(
+            normalize_path(PathBuf::from("/home/user/foo/../bar")),
+            PathBuf::from("/home/user/bar"),
+        );
+    }
+
+    #[test]
+    fn test_normalize_path_root_dotdot_stays_at_root() {
+        // `/../etc` must not pop the root component – result is `/etc`.
+        assert_eq!(
+            normalize_path(PathBuf::from("/../etc")),
+            PathBuf::from("/etc"),
+        );
+    }
+
+    #[test]
+    fn test_normalize_path_relative_leading_dotdot_preserved() {
+        // Relative leading `..` cannot be resolved without a base, keep them.
+        assert_eq!(
+            normalize_path(PathBuf::from("../outside")),
+            PathBuf::from("../outside"),
+        );
+    }
+
+    #[test]
+    fn test_expand_tilde_traversal_clamped_to_screenshots() {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        // `~/foo/../../etc` normalises to `/<home_parent>/etc` which is
+        // outside home, so expand_tilde must fall back to ~/Screenshots.
+        let result = expand_tilde(&PathBuf::from("~/foo/../../etc"));
+        assert_eq!(result, home.join("Screenshots"));
+    }
+
+    #[test]
+    fn test_expand_tilde_absolute_path_is_passed_through() {
+        // An explicit absolute path is never subject to the home-escape guard.
+        assert_eq!(
+            expand_tilde(&PathBuf::from("/tmp/screenshots")),
+            PathBuf::from("/tmp/screenshots"),
         );
     }
 }
