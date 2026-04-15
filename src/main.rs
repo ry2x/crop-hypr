@@ -103,14 +103,14 @@ fn main() {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("error: failed to load config '{}': {}", path.display(), e);
-                std::process::exit(1);
+                std::process::exit(e.exit_code());
             }
         },
         None => match Config::load() {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("error: failed to load config: {}", e);
-                std::process::exit(1);
+                std::process::exit(e.exit_code());
             }
         },
     };
