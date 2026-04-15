@@ -38,29 +38,18 @@ enum Commands {
     },
 }
 
-fn run() -> Result<()> {
-    let cli = Cli::parse();
-
-    if let Commands::GenerateConfig { force } = cli.command {
-        return generate_config(cli.config.as_deref(), force);
-    }
-
-    let cfg = match &cli.config {
-        Some(path) => Config::load_from(path)?,
-        None => Config::load()?,
-    };
-
+fn run(cli: &Cli, cfg: &Config) -> Result<()> {
     // Create save directory during initialization
     std::fs::create_dir_all(&cfg.save_path)
         .map_err(|e| AppError::FileSystem(cfg.save_path.clone(), e))?;
 
     match cli.command {
-        Commands::Crop => finish(capture::capture_crop(&cfg)?)?,
-        Commands::Window => finish(capture::capture_window(&cfg)?)?,
-        Commands::Portal => finish(capture::capture_portal(&cfg)?)?,
-        Commands::Monitor => finish(capture::capture_monitor(&cfg)?)?,
-        Commands::All => finish(capture::capture_all(&cfg)?)?,
-        Commands::Freeze => finish(freeze::run_freeze(&cfg)?)?,
+        Commands::Crop => finish(capture::capture_crop(cfg)?, cfg)?,
+        Commands::Window => finish(capture::capture_window(cfg)?, cfg)?,
+        Commands::Portal => finish(capture::capture_portal(cfg)?, cfg)?,
+        Commands::Monitor => finish(capture::capture_monitor(cfg)?, cfg)?,
+        Commands::All => finish(capture::capture_all(cfg)?, cfg)?,
+        Commands::Freeze => finish(freeze::run_freeze(cfg)?, cfg)?,
         Commands::GenerateConfig { .. } => unreachable!(),
     }
 
@@ -91,22 +80,35 @@ fn generate_config(custom_path: Option<&std::path::Path>, force: bool) -> Result
     Ok(())
 }
 
-fn finish(path: std::path::PathBuf) -> Result<()> {
+fn finish(path: std::path::PathBuf, cfg: &Config) -> Result<()> {
     clipboard::copy_to_clipboard(&path)?;
     println!("{}", path.display());
-    let cfg = Config::load().unwrap_or_default();
     notify::notify_success(&path, &cfg.notifications);
     Ok(())
 }
 
 fn main() {
-    if let Err(e) = run() {
+    let cli = Cli::parse();
+
+    if let Commands::GenerateConfig { force } = cli.command {
+        if let Err(e) = generate_config(cli.config.as_deref(), force) {
+            eprintln!("error: {}", e);
+            std::process::exit(e.exit_code());
+        }
+        return;
+    }
+
+    let cfg = match &cli.config {
+        Some(path) => Config::load_from(path).unwrap_or_default(),
+        None => Config::load().unwrap_or_default(),
+    };
+
+    if let Err(e) = run(&cli, &cfg) {
         if let AppError::UserCancelled = &e {
             std::process::exit(e.exit_code());
         }
 
         eprintln!("error: {}", e);
-        let cfg = Config::load().unwrap_or_default();
         notify::notify_error(&e.to_string(), &cfg.notifications);
         std::process::exit(e.exit_code());
     }
