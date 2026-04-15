@@ -43,7 +43,36 @@ pub fn notify_success(path: &Path, config: &Notifications) {
     std::thread::spawn(move || {
         handle.wait_for_action(|action| {
             if action == "default" {
-                let _ = Command::new(&success_action).arg(&path_str).spawn();
+                let parts = shell_words::split(&success_action).unwrap_or_else(|_| {
+                    eprintln!(
+                        "[hyprcrop] error: failed to parse action command: '{}'",
+                        success_action
+                    );
+                    vec![]
+                });
+
+                let Some((cmd, args)) = parts.split_first() else {
+                    return;
+                };
+
+                let has_path_placeholder = args.iter().any(|a| a.contains("{path}"));
+                let substituted: Vec<String> = args
+                    .iter()
+                    .map(|a| a.replace("{path}", &path_str))
+                    .collect();
+
+                let mut command = Command::new(cmd);
+                command.args(&substituted);
+                if !has_path_placeholder {
+                    command.arg(&path_str);
+                }
+
+                if let Err(e) = command.spawn() {
+                    eprintln!(
+                        "[hyprcrop] error: failed to execute action '{}': {e}",
+                        success_action
+                    );
+                }
             }
         });
         let _ = tx.send(());
@@ -63,6 +92,7 @@ pub fn notify_error(msg: &str, config: &Notifications) {
         .urgency(notify_rust::Urgency::Critical)
         .summary(&config.error_summary.replace("{error}", msg))
         .body(&config.error_body.replace("{error}", msg))
+        .timeout(Timeout::Never)
         .show()
     {
         eprintln!("[hyprcrop] warning: failed to send notification: {e}");
