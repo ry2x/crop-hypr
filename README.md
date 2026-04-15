@@ -151,8 +151,7 @@ all     = "󰁌"
 cancel  = "󰖭"
 
 # ── Notifications ─────────────────────────────────────────────────────────────
-# Variables: {path} = saved  can be used in success_summary, success_body, and success_action;
-# variables: file path, {error} = error message  can be used in error_summary and error_body.
+# Variables: {path} = saved file path (success_summary, success_body, success_action); {error} = error message (error_summary, error_body).
 [notifications]
 enabled          = true
 success_action   = "xdg-open"   # command run when notification is clicked; shell-split, use {path} placeholder or path is appended

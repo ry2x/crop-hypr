@@ -149,8 +149,8 @@ all     = "󰁌"
 cancel  = "󰖭"
 
 # ── 通知設定 ─────────────────────────────────────────────────────────────────
-# 変数: {path} = 保存先ファイルパス susccess_summary, success_body,sucess_actionで使用可能 
-# 変数: {error} = エラーメッセージ error_summary, error_bodyで使用可能
+# 変数: {path} = 保存先ファイルパス。success_summary、success_body、success_action で使用可能。
+# 変数: {error} = エラーメッセージ。error_summary、error_body で使用可能。
 [notifications]
 enabled          = true
 success_action   = "xdg-open"   # 通知クリック時に実行するコマンド（シェル分割対応、{path}プレースホルダーまたは末尾に自動追加）
