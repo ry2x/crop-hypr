@@ -21,7 +21,9 @@ The following tools must be available on `$PATH`:
 | ------------- | ---------------------------------------- |
 | `slurp`       | Interactive region selection (crop mode) |
 | `wl-copy`     | Copy image to Wayland clipboard          |
-| `notify-send` | Desktop notifications (optional)         |
+
+Desktop notifications are sent natively via D-Bus (no `notify-send` required). A running
+notification daemon (e.g. `mako`, `dunst`) is needed to display them.
 
 Screen capture is performed natively via the **`zwlr_screencopy_manager_v1`** Wayland protocol
 (wlroots-based compositors: Hyprland, sway, etc.) — no external capture tool is required.
@@ -148,6 +150,17 @@ monitor = "󰍹"
 all     = "󰁌"
 cancel  = "󰖭"
 
+# ── Notifications ─────────────────────────────────────────────────────────────
+# Variables: {path} = saved file path, {error} = error message
+# [notifications]
+# enabled          = true
+# success_action   = "xdg-open"   # command to run when "Open" is clicked
+# success_timeout  = 5000         # ms to wait for action; 0 = fire-and-forget (no "Open" button)
+# success_summary  = "Screenshot saved"
+# success_body     = "{path}"
+# error_summary    = "Screenshot failed"
+# error_body       = "{error}"
+
 # ── Freeze mode UI colors ─────────────────────────────────────────────────────
 # All colors are CSS-style hex strings: "#RRGGBBAA" (or "#RRGGBB", "#RGBA", "#RGB").
 # Every key is optional; omitted keys fall back to the built-in defaults shown below.
@@ -200,6 +213,13 @@ cancel  = "󰖭"
 | ---------------------------------------------- | ------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `save_path`                                    | path         | XDG Pictures dir + `/Screenshots` (fallback: `$HOME/Screenshots`) | Destination directory for saved screenshots                                                     |
 | `filename_pattern`                             | string       | `hyprsnap_%Y%m%d_%H%M%S`                                          | strftime pattern for filenames (no extension)                                                   |
+| `notifications.enabled`                        | bool         | `true`                                                            | Send desktop notifications on success/failure                                                   |
+| `notifications.success_action`                 | string       | `"xdg-open"`                                                      | Command run when the "Open" button is clicked                                                   |
+| `notifications.success_timeout`                | integer (ms) | `5000`                                                            | How long hyprcrop waits for an action click. `0` = fire-and-forget (no "Open" button shown)    |
+| `notifications.success_summary`                | string       | `"Screenshot saved"`                                              | Notification title on success. `{path}` is replaced with the saved file path                   |
+| `notifications.success_body`                   | string       | `"{path}"`                                                        | Notification body on success. `{path}` is replaced with the saved file path                    |
+| `notifications.error_summary`                  | string       | `"Screenshot failed"`                                             | Notification title on failure. `{error}` is replaced with the error message                    |
+| `notifications.error_body`                     | string       | `"{error}"`                                                       | Notification body on failure. `{error}` is replaced with the error message                     |
 | `toolbar_position`                             | string       | `top`                                                             | Freeze toolbar edge: `top`, `bottom`, `left`, or `right`                                        |
 | `capture_window_border`                        | bool         | `false`                                                           | Include Hyprland window border in window captures; also draws rounded highlights in freeze mode |
 | `freeze_glyphs.crop`                           | string       | `󰆟` (U+F019F)                                                     | Toolbar icon for crop mode                                                                      |
