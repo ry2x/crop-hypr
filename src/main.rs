@@ -99,8 +99,20 @@ fn main() {
     }
 
     let cfg = match &cli.config {
-        Some(path) => Config::load_from(path).unwrap_or_default(),
-        None => Config::load().unwrap_or_default(),
+        Some(path) => match Config::load_from(path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("error: failed to load config '{}': {}", path.display(), e);
+                std::process::exit(1);
+            }
+        },
+        None => match Config::load() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("error: failed to load config: {}", e);
+                std::process::exit(1);
+            }
+        },
     };
 
     if let Err(e) = run(&cli, &cfg) {
