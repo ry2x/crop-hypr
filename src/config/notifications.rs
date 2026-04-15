@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationsConfig {
-    pub enable: bool,
+    pub enabled: bool,
     pub success_action: String,
     pub success_timeout: u32,
     pub success_summary: String,
@@ -22,7 +22,7 @@ pub struct NotificationsConfig {
 impl Default for NotificationsConfig {
     fn default() -> Self {
         Self {
-            enable: true,
+            enabled: true,
             success_action: "xdg-open".to_string(),
             success_timeout: 5000,
             success_summary: "Screenshot saved".to_string(),

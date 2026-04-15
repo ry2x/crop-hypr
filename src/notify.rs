@@ -5,7 +5,7 @@ use std::process::Command;
 use crate::config::NotificationsConfig;
 
 pub fn notify_success(path: &Path, config: &NotificationsConfig) {
-    if !config.enable {
+    if !config.enabled {
         return;
     }
 
@@ -31,7 +31,7 @@ pub fn notify_success(path: &Path, config: &NotificationsConfig) {
 }
 
 pub fn notify_error(msg: &str, config: &NotificationsConfig) {
-    if !config.enable {
+    if !config.enabled {
         return;
     }
 
