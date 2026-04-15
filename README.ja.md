@@ -149,15 +149,16 @@ all     = "󰁌"
 cancel  = "󰖭"
 
 # ── 通知設定 ─────────────────────────────────────────────────────────────────
-# 変数: {path} = 保存先ファイルパス, {error} = エラーメッセージ
-# [notifications]
-# enabled          = true
-# success_action   = "xdg-open"   # "Open" ボタンクリック時に実行するコマンド
-# success_timeout  = 5000         # アクション待機時間（ms）。0 = 即終了（"Open" ボタンなし）
-# success_summary  = "Screenshot saved"
-# success_body     = "{path}"
-# error_summary    = "Screenshot failed"
-# error_body       = "{error}"
+# 変数: {path} = 保存先ファイルパス susccess_summary, success_body,sucess_actionで使用可能 
+# 変数: {error} = エラーメッセージ error_summary, error_bodyで使用可能
+[notifications]
+enabled          = true
+success_action   = "xdg-open"   # 通知クリック時に実行するコマンド（シェル分割対応、{path}プレースホルダーまたは末尾に自動追加）
+success_timeout  = 5000         # アクション待機時間（ms）。0 = 即終了（"Open" ボタンなし）
+success_summary  = "Screenshot saved"
+success_body     = "{path}"
+error_summary    = "Screenshot failed"
+error_body       = "{error}"
 
 # ── フリーズモード UI カラー ──────────────────────────────────────────────────
 # 色は CSS 形式の 16 進 RGBA 文字列 `"#RRGGBBAA"` で指定します。
@@ -212,7 +213,7 @@ cancel  = "󰖭"
 | `save_path`                                    | path         | XDG Pictures ディレクトリ + `/Screenshots`（fallback: `$HOME/Screenshots`） | 保存先ディレクトリ                                                                             |
 | `filename_pattern`                             | string       | `hyprsnap_%Y%m%d_%H%M%S`                                                    | ファイル名のstrftimeパターン（拡張子なし）                                                     |
 | `notifications.enabled`                        | bool         | `true`                                                                       | 成功・失敗時にデスクトップ通知を送る                                                           |
-| `notifications.success_action`                 | string       | `"xdg-open"`                                                                 | 「Open」ボタンクリック時に実行するコマンド                                                     |
+| `notifications.success_action`                 | string       | `"xdg-open"`                                                                 | 「Open」クリック時のコマンド。シェル分割対応（例: `"satty -f {path}"`）。`{path}` でパス埋め込み、なければ末尾に自動追加 |
 | `notifications.success_timeout`                | 整数 (ms)    | `5000`                                                                       | アクション待機時間。`0` = 即終了（「Open」ボタンは表示されない）                               |
 | `notifications.success_summary`                | string       | `"Screenshot saved"`                                                         | 成功時の通知タイトル。`{path}` は保存先パスに置換                                             |
 | `notifications.success_body`                   | string       | `"{path}"`                                                                   | 成功時の通知本文。`{path}` は保存先パスに置換                                                 |

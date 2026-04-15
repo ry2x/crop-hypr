@@ -43,12 +43,18 @@ pub struct Notifications {
 }
 
 // Available variables:
-// - {path}: path to the saved screenshot (success_summary, success_body)
+// - {path}: path to the saved screenshot (success_summary, success_body, success_action)
 // - {error}: error message (error_summary, error_body)
+//
+// success_action: command to run when notification is clicked. The string is parsed
+// with shell-word splitting (e.g. `"satty -f {path}"` works correctly).
+// Use `{path}` anywhere in the string to insert the screenshot path; if `{path}` is
+// absent the path is automatically appended as the final argument.
 //
 // success_timeout (milliseconds): how long hyprcrop waits for the user to click "Open".
 // Set to 0 for fire-and-forget — process exits immediately, no action button is shown.
-// Note: notifications always persist on screen until dismissed by the user.
+// Both success and error notifications use Timeout::Never so they persist until the
+// user dismisses them, regardless of success_timeout.
 impl Default for Notifications {
     fn default() -> Self {
         Self {

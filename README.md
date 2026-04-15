@@ -151,15 +151,16 @@ all     = "󰁌"
 cancel  = "󰖭"
 
 # ── Notifications ─────────────────────────────────────────────────────────────
-# Variables: {path} = saved file path, {error} = error message
-# [notifications]
-# enabled          = true
-# success_action   = "xdg-open"   # command to run when "Open" is clicked
-# success_timeout  = 5000         # ms to wait for action; 0 = fire-and-forget (no "Open" button)
-# success_summary  = "Screenshot saved"
-# success_body     = "{path}"
-# error_summary    = "Screenshot failed"
-# error_body       = "{error}"
+# Variables: {path} = saved  can be used in success_summary, success_body, and success_action;
+# variables: file path, {error} = error message  can be used in error_summary and error_body.
+[notifications]
+enabled          = true
+success_action   = "xdg-open"   # command run when notification is clicked; shell-split, use {path} placeholder or path is appended
+success_timeout  = 5000         # ms to wait for action; 0 = fire-and-forget (no "Open" button)
+success_summary  = "Screenshot saved"
+success_body     = "{path}"
+error_summary    = "Screenshot failed"
+error_body       = "{error}"
 
 # ── Freeze mode UI colors ─────────────────────────────────────────────────────
 # All colors are CSS-style hex strings: "#RRGGBBAA" (or "#RRGGBB", "#RGBA", "#RGB").
@@ -214,7 +215,7 @@ cancel  = "󰖭"
 | `save_path`                                    | path         | XDG Pictures dir + `/Screenshots` (fallback: `$HOME/Screenshots`) | Destination directory for saved screenshots                                                     |
 | `filename_pattern`                             | string       | `hyprsnap_%Y%m%d_%H%M%S`                                          | strftime pattern for filenames (no extension)                                                   |
 | `notifications.enabled`                        | bool         | `true`                                                            | Send desktop notifications on success/failure                                                   |
-| `notifications.success_action`                 | string       | `"xdg-open"`                                                      | Command run when the "Open" button is clicked                                                   |
+| `notifications.success_action`                 | string       | `"xdg-open"`                                                      | Command run when "Open" is clicked. Shell-split (e.g. `"satty -f {path}"`). Use `{path}` to embed the path, or it is appended automatically |
 | `notifications.success_timeout`                | integer (ms) | `5000`                                                            | How long hyprcrop waits for an action click. `0` = fire-and-forget (no "Open" button shown)    |
 | `notifications.success_summary`                | string       | `"Screenshot saved"`                                              | Notification title on success. `{path}` is replaced with the saved file path                   |
 | `notifications.success_body`                   | string       | `"{path}"`                                                        | Notification body on success. `{path}` is replaced with the saved file path                    |
