@@ -226,16 +226,15 @@ fn expand_tilde(path: &std::path::Path) -> PathBuf {
     // For tilde-expanded or relative paths, guard against `..` traversal
     // that escapes the home directory (e.g. `~/foo/../../etc`).
     // Explicit absolute paths (e.g. `/tmp/screenshots`) are passed through as-is.
-    if from_tilde_or_relative || !path.is_absolute() {
-        if let Some(home) = dirs::home_dir() {
-            if !normalized.starts_with(&home) {
-                eprintln!(
-                    "[hyprcrop] warning: save_path '{}' resolves outside home directory, falling back to ~/Screenshots",
-                    path.display()
-                );
-                return home.join("Screenshots");
-            }
-        }
+    if (from_tilde_or_relative || !path.is_absolute())
+        && let Some(home) = dirs::home_dir()
+        && !normalized.starts_with(&home)
+    {
+        eprintln!(
+            "[hyprcrop] warning: save_path '{}' resolves outside home directory, falling back to ~/Screenshots",
+            path.display()
+        );
+        return home.join("Screenshots");
     }
 
     normalized
