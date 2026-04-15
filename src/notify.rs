@@ -4,31 +4,40 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::config::NotificationsConfig;
+use crate::config::Notifications;
 
-pub fn notify_success(path: &Path, config: &NotificationsConfig) {
+pub fn notify_success(path: &Path, config: &Notifications) {
     if !config.enabled {
         return;
     }
 
     let path_str = path.display().to_string();
     let success_action = config.success_action.clone();
+    let listen_for_action = config.success_timeout > 0;
 
-    let handle = match Notification::new()
+    let mut notification = Notification::new();
+    notification
         .appname("hyprcrop")
         .icon(&path_str)
         .summary(&config.success_summary.replace("{path}", &path_str))
         .body(&config.success_body.replace("{path}", &path_str))
-        .action("default", "Open")
-        .timeout(Timeout::Never)
-        .show()
-    {
+        .timeout(Timeout::Never);
+
+    if listen_for_action {
+        notification.action("default", "Open");
+    }
+
+    let handle = match notification.show() {
         Ok(h) => h,
         Err(e) => {
             eprintln!("[hyprcrop] warning: failed to send notification: {e}");
             return;
         }
     };
+
+    if !listen_for_action {
+        return;
+    }
 
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
@@ -43,7 +52,7 @@ pub fn notify_success(path: &Path, config: &NotificationsConfig) {
     let _ = rx.recv_timeout(Duration::from_millis(config.success_timeout.into()));
 }
 
-pub fn notify_error(msg: &str, config: &NotificationsConfig) {
+pub fn notify_error(msg: &str, config: &Notifications) {
     if !config.enabled {
         return;
     }

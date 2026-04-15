@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-// ── NotificationsConfig ───────────────────────────────────────────────────────────────
+// ── Notifications ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NotificationsConfig {
+pub struct Notifications {
     pub enabled: bool,
     pub success_action: String,
     pub success_timeout: u32,
@@ -13,13 +13,14 @@ pub struct NotificationsConfig {
     pub error_body: String,
 }
 
-// Available variables for notification bodies:
-// - {path}: the path to the saved screenshot (for success_summary and success_body)
-// - {error}: the error message (for error_summary and error_body)
-// success_timeout is in milliseconds. Set to 0 for no timeout (persistent notification).
-// default success_timeout is 5000 (5 seconds). Note that some desktop environments may have a maximum timeout limit, and may ignore timeouts that exceed this limit.
-// In general, longer timeouts are recommended for the success notification, since it allows the user more time to click the notification themselves.
-impl Default for NotificationsConfig {
+// Available variables:
+// - {path}: path to the saved screenshot (success_summary, success_body)
+// - {error}: error message (error_summary, error_body)
+//
+// success_timeout (milliseconds): how long hyprcrop waits for the user to click "Open".
+// Set to 0 for fire-and-forget — process exits immediately, no action button is shown.
+// Note: notifications always persist on screen until dismissed by the user.
+impl Default for Notifications {
     fn default() -> Self {
         Self {
             enabled: true,

@@ -4,7 +4,7 @@ pub use colors::{
     OverlayColors, RgbaColor, ToolbarColors, WindowFrameColors,
 };
 pub mod notifications;
-pub use notifications::NotificationsConfig;
+pub use notifications::Notifications;
 
 use std::{
     fs,
@@ -97,7 +97,7 @@ pub struct Config {
     pub capture_window_border: bool,
 
     #[serde(default)]
-    pub notifications: NotificationsConfig,
+    pub notifications: Notifications,
 
     /// Colors for every element of the freeze-mode overlay UI.
     /// All keys are optional; omitted keys fall back to the built-in defaults.
@@ -127,7 +127,7 @@ impl Default for Config {
             freeze_glyphs: FreezeGlyphs::default(),
             toolbar_position: ToolbarPosition::default(),
             capture_window_border: default_capture_window_border(),
-            notifications: NotificationsConfig::default(),
+            notifications: Notifications::default(),
             freeze_colors: FreezeColors::default(),
         }
     }
