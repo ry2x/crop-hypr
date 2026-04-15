@@ -52,6 +52,8 @@ ashpd = { version = "0.13", default-features = false, features = [
 ] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 pipewire = "0.9"
+notify-rust = "4.5"
+shell-words = "1.1.1"
 
 [profile.release]
 opt-level = 3

@@ -3,6 +3,8 @@ pub use colors::{
     ButtonColors, CancelButtonColors, CropFrameColors, FreezeColors, MonitorFrameColors,
     OverlayColors, RgbaColor, ToolbarColors, WindowFrameColors,
 };
+pub mod notifications;
+pub use notifications::Notifications;
 
 use std::{
     fs,
@@ -94,6 +96,9 @@ pub struct Config {
     #[serde(default = "default_capture_window_border")]
     pub capture_window_border: bool,
 
+    #[serde(default)]
+    pub notifications: Notifications,
+
     /// Colors for every element of the freeze-mode overlay UI.
     /// All keys are optional; omitted keys fall back to the built-in defaults.
     #[serde(default)]
@@ -122,6 +127,7 @@ impl Default for Config {
             freeze_glyphs: FreezeGlyphs::default(),
             toolbar_position: ToolbarPosition::default(),
             capture_window_border: default_capture_window_border(),
+            notifications: Notifications::default(),
             freeze_colors: FreezeColors::default(),
         }
     }
@@ -201,10 +207,7 @@ fn expand_tilde(path: &std::path::Path) -> PathBuf {
             true,
         )
     } else if s == "~" {
-        (
-            dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")),
-            true,
-        )
+        (dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")), true)
     } else {
         (path.to_path_buf(), false)
     };
@@ -223,16 +226,15 @@ fn expand_tilde(path: &std::path::Path) -> PathBuf {
     // For tilde-expanded or relative paths, guard against `..` traversal
     // that escapes the home directory (e.g. `~/foo/../../etc`).
     // Explicit absolute paths (e.g. `/tmp/screenshots`) are passed through as-is.
-    if from_tilde_or_relative || !path.is_absolute() {
-        if let Some(home) = dirs::home_dir() {
-            if !normalized.starts_with(&home) {
-                eprintln!(
-                    "[hyprcrop] warning: save_path '{}' resolves outside home directory, falling back to ~/Screenshots",
-                    path.display()
-                );
-                return home.join("Screenshots");
-            }
-        }
+    if (from_tilde_or_relative || !path.is_absolute())
+        && let Some(home) = dirs::home_dir()
+        && !normalized.starts_with(&home)
+    {
+        eprintln!(
+            "[hyprcrop] warning: save_path '{}' resolves outside home directory, falling back to ~/Screenshots",
+            path.display()
+        );
+        return home.join("Screenshots");
     }
 
     normalized
