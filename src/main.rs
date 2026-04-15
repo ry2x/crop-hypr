@@ -93,8 +93,9 @@ fn generate_config(custom_path: Option<&std::path::Path>, force: bool) -> Result
 
 fn finish(path: std::path::PathBuf) -> Result<()> {
     clipboard::copy_to_clipboard(&path)?;
-    notify::notify_success(&path);
     println!("{}", path.display());
+    let cfg = Config::load().unwrap_or_default();
+    notify::notify_success(&path, &cfg.notifications);
     Ok(())
 }
 
@@ -105,7 +106,8 @@ fn main() {
         }
 
         eprintln!("error: {}", e);
-        let _ = notify::notify_error(&e.to_string());
+        let cfg = Config::load().unwrap_or_default();
+        notify::notify_error(&e.to_string(), &cfg.notifications);
         std::process::exit(e.exit_code());
     }
 }
