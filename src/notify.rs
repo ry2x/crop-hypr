@@ -43,25 +43,29 @@ pub fn notify_success(path: &Path, config: &Notifications) {
     std::thread::spawn(move || {
         handle.wait_for_action(|action| {
             if action == "default" {
-                let parts = shell_words::split(&success_action).unwrap_or_else(|_| {
-                    eprintln!(
-                        "[hyprcrop] error: failed to parse action command: '{}'",
-                        success_action
-                    );
-                    vec![]
-                });
+                let parts = match shell_words::split(&success_action) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!(
+                            "[hyprcrop] error: failed to parse action command '{}': {e}",
+                            success_action
+                        );
+                        return;
+                    }
+                };
 
                 let Some((cmd, args)) = parts.split_first() else {
                     return;
                 };
 
-                let has_path_placeholder = args.iter().any(|a| a.contains("{path}"));
+                let has_path_placeholder = parts.iter().any(|p| p.contains("{path}"));
+                let cmd = cmd.replace("{path}", &path_str);
                 let substituted: Vec<String> = args
                     .iter()
                     .map(|a| a.replace("{path}", &path_str))
                     .collect();
 
-                let mut command = Command::new(cmd);
+                let mut command = Command::new(&cmd);
                 command.args(&substituted);
                 if !has_path_placeholder {
                     command.arg(&path_str);
