@@ -113,6 +113,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         let glyphs = cfg.freeze_glyphs.clone();
         let toolbar_position = cfg.toolbar_position;
         let colors = cfg.freeze_colors;
+        let freeze_buttons = cfg.freeze_buttons;
 
         iced_layershell::daemon(
             move || {
@@ -139,6 +140,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     border_style,
                     initial_mode,
                     colors,
+                    freeze_buttons,
                 });
                 (state, Task::batch(spawn_tasks))
             },
