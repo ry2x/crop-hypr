@@ -150,7 +150,10 @@ cancel  = "󰖭"
 # size = 26.0  # ツールバーボタン内のグリフテキストサイズ（ピクセル）
 
 # フリーズモードのツールバーに表示するボタンを個別にON/OFFできます。
-# falseにしたボタンはツールバーから消えます。すべてfalseの場合、ツールバー自体が非表示になります。
+# falseにしたボタンはツールバーから消えます。
+# キャプチャモードボタン（crop/window/monitor/all）がすべてfalseの場合、
+# フリーズモードはCropキャンバス選択（ドラッグ選択）にフォールバックします。
+# cancel = true の場合はキャンセルボタンのみツールバーに表示されます。
 [freeze_buttons]
 crop    = true
 window  = true
@@ -241,7 +244,7 @@ error_body       = "{error}"
 | `freeze_buttons.window`                        | bool         | `true`                                                                                      | windowボタンの表示                                                                             |
 | `freeze_buttons.monitor`                       | bool         | `true`                                                                                      | monitorボタンの表示                                                                            |
 | `freeze_buttons.all`                           | bool         | `true`                                                                                      | allボタンの表示                                                                                |
-| `freeze_buttons.cancel`                        | bool         | `true`                                                                                      | cancelボタンの表示。すべて`false`の場合はツールバー自体が非表示                                |
+| `freeze_buttons.cancel`                        | bool         | `true`                                                                                      | cancelボタンの表示。キャプチャモードボタンがすべて`false`の場合はCropキャンバス選択にフォールバック。cancel=trueならキャンセルボタンのみ表示 |
 | `freeze_colors.overlay.background`             | string (hex) | `"#00000059"`                                                               | 凍結画面上のディムフィル                                                                       |
 | `freeze_colors.toolbar.background`             | string (hex) | `"#141414D9"`                                                               | ツールバー背景                                                                                 |
 | `freeze_colors.button.idle_background`         | string (hex) | `"#797A7DFF"`                                                               | モードボタン・非選択時の背景                                                                   |

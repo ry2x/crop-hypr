@@ -152,7 +152,9 @@ cancel  = "󰖭"
 # size = 26.0  # glyph text size inside toolbar buttons (pixels)
 
 # Controls which buttons are visible in the freeze mode toolbar.
-# Set any button to false to hide it. If all are false, the toolbar is hidden entirely.
+# Set any button to false to hide it. If all capture-mode buttons (crop/window/monitor/all)
+# are false, freeze mode defaults to Crop canvas selection (drag-to-select still works);
+# the toolbar is hidden unless cancel = true.
 [freeze_buttons]
 crop    = true
 window  = true
@@ -242,7 +244,7 @@ error_body       = "{error}"
 | `freeze_buttons.window`                        | bool         | `true`                                                                    | Show the Window button in the toolbar                                                           |
 | `freeze_buttons.monitor`                       | bool         | `true`                                                                    | Show the Monitor button in the toolbar                                                          |
 | `freeze_buttons.all`                           | bool         | `true`                                                                    | Show the All button in the toolbar                                                              |
-| `freeze_buttons.cancel`                        | bool         | `true`                                                                    | Show the Cancel button in the toolbar. When all buttons are `false`, the toolbar is hidden      |
+| `freeze_buttons.cancel`                        | bool         | `true`                                                                    | Show the Cancel button in the toolbar. If all capture-mode buttons are `false`, freeze defaults to Crop canvas selection; toolbar hidden unless cancel is `true` |
 | `freeze_colors.overlay.background`             | string (hex) | `"#00000059"`                                                     | Dim fill over frozen screen                                                                     |
 | `freeze_colors.toolbar.background`             | string (hex) | `"#141414D9"`                                                     | Toolbar pill background                                                                         |
 | `freeze_colors.button.idle_background`         | string (hex) | `"#797A7DFF"`                                                     | Mode button — unselected background                                                             |
