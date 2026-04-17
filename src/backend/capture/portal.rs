@@ -19,7 +19,7 @@ use pw::{
     stream::StreamFlags,
 };
 
-use crate::{
+use crate::core::{
     config::Config,
     error::{AppError, Result},
 };

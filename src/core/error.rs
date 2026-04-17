@@ -42,6 +42,12 @@ pub enum AppError {
     #[error("Iced Layershell error: {0}")]
     LayerShell(String),
 
+    #[error("Wayland error: {0}")]
+    Wayland(String),
+
+    #[error("Screencopy failed: {0}")]
+    Screencopy(String),
+
     #[error("File system error on path {0}: {1}")]
     FileSystem(PathBuf, #[source] std::io::Error),
 

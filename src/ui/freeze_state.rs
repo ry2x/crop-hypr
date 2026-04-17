@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use crate::freeze::CaptureMode;
+use crate::ui::freeze::CaptureMode;
 
 /// Returns `$XDG_STATE_HOME/hyprcrop/last_mode`
 /// (falls back to `~/.local/state/hyprcrop/last_mode`).

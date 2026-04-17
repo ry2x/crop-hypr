@@ -15,12 +15,14 @@ use iced::{
     },
 };
 
-use crate::config::{
+use crate::backend::system::hyprland::{
+    BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo,
+};
+use crate::core::config::{
     CropFrameColors, FreezeButtons, FreezeColors, FreezeGlyphs, MonitorFrameColors, RgbaColor,
     ToolbarPosition, WindowFrameColors,
 };
-use crate::freeze_state;
-use crate::hyprland::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
+use crate::ui::freeze_state;
 
 // ── Message ───────────────────────────────────────────────────────────────────
 

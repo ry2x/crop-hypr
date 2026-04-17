@@ -1,11 +1,4 @@
-pub mod capture;
-pub mod clipboard;
-pub mod cmd;
-pub mod config;
-pub mod error;
-pub mod freeze;
-pub mod freeze_state;
-pub mod hyprland;
-pub mod notify;
-pub mod portal;
-pub mod screencopy;
+pub mod backend;
+pub mod cli;
+pub mod core;
+pub mod ui;

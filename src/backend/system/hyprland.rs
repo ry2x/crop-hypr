@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
-use crate::error::{AppError, Result};
+use crate::core::error::{AppError, Result};
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct ScreenRect {

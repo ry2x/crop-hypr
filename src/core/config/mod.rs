@@ -3,8 +3,14 @@ pub use colors::{
     ButtonColors, CancelButtonColors, CropFrameColors, FreezeColors, MonitorFrameColors,
     OverlayColors, RgbaColor, ToolbarColors, WindowFrameColors,
 };
+pub mod general;
+pub use general::{
+    default_capture_window_border, default_filename_pattern, default_save_path,
+};
 pub mod notifications;
 pub use notifications::Notifications;
+pub mod ui;
+pub use ui::{FreezeButtons, FreezeGlyphs, ToolbarPosition};
 
 use std::{
     fs,
@@ -13,125 +19,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{AppError, Result};
-
-// ── Freeze UI glyphs ──────────────────────────────────────────────────────────
-
-/// Icon glyphs displayed in the freeze-mode toolbar.
-/// Defaults match the Nerd Fonts / Material Design icons used by default.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FreezeGlyphs {
-    #[serde(default = "default_glyph_crop")]
-    pub crop: String,
-    #[serde(default = "default_glyph_window")]
-    pub window: String,
-    #[serde(default = "default_glyph_monitor")]
-    pub monitor: String,
-    #[serde(default = "default_glyph_all")]
-    pub all: String,
-    #[serde(default = "default_glyph_cancel")]
-    pub cancel: String,
-    /// Text size (in pixels) of the glyph inside each toolbar button.
-    #[serde(default = "default_glyph_size")]
-    pub size: f32,
-}
-
-fn default_glyph_crop() -> String {
-    "\u{F019F}".to_string()
-}
-fn default_glyph_window() -> String {
-    "\u{EB7F}".to_string()
-}
-fn default_glyph_monitor() -> String {
-    "\u{F0379}".to_string()
-}
-fn default_glyph_all() -> String {
-    "\u{F004C}".to_string()
-}
-fn default_glyph_cancel() -> String {
-    "\u{F05AD}".to_string()
-}
-fn default_glyph_size() -> f32 {
-    26.0
-}
-
-impl Default for FreezeGlyphs {
-    fn default() -> Self {
-        Self {
-            crop: default_glyph_crop(),
-            window: default_glyph_window(),
-            monitor: default_glyph_monitor(),
-            all: default_glyph_all(),
-            cancel: default_glyph_cancel(),
-            size: default_glyph_size(),
-        }
-    }
-}
-
-// ── Toolbar button visibility ─────────────────────────────────────────────────
-
-/// Controls which buttons are visible in the freeze-mode toolbar.
-/// Buttons set to `false` are omitted entirely; if all are `false`, the
-/// toolbar container is not rendered.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct FreezeButtons {
-    #[serde(default = "default_true")]
-    pub crop: bool,
-    #[serde(default = "default_true")]
-    pub window: bool,
-    #[serde(default = "default_true")]
-    pub monitor: bool,
-    #[serde(default = "default_true")]
-    pub all: bool,
-    #[serde(default = "default_true")]
-    pub cancel: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-impl Default for FreezeButtons {
-    fn default() -> Self {
-        Self {
-            crop: true,
-            window: true,
-            monitor: true,
-            all: true,
-            cancel: true,
-        }
-    }
-}
-
-impl FreezeButtons {
-    /// Returns `true` if at least one button (including cancel) is enabled.
-    pub fn any_visible(&self) -> bool {
-        self.crop || self.window || self.monitor || self.all || self.cancel
-    }
-
-    /// Returns `true` if at least one *capture-mode* button is enabled.
-    ///
-    /// When this returns `false` (all of crop/window/monitor/all are disabled),
-    /// freeze mode falls back to `Crop` canvas selection so the user can still
-    /// drag-select a region even without toolbar buttons. The `cancel` button is
-    /// excluded because it does not initiate a capture.
-    pub fn any_capture_enabled(&self) -> bool {
-        self.crop || self.window || self.monitor || self.all
-    }
-}
-
-// ── Toolbar position ──────────────────────────────────────────────────────────
-
-/// Edge of the screen where the freeze-mode toolbar is docked.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum ToolbarPosition {
-    #[default]
-    Top,
-    Bottom,
-    Left,
-    Right,
-}
+use crate::core::error::{AppError, Result};
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -167,20 +55,6 @@ pub struct Config {
     /// Buttons set to `false` are omitted; if all are `false`, the toolbar is hidden.
     #[serde(default)]
     pub freeze_buttons: FreezeButtons,
-}
-
-fn default_capture_window_border() -> bool {
-    false
-}
-
-fn default_save_path() -> PathBuf {
-    dirs::picture_dir()
-        .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")))
-        .join("Screenshots")
-}
-
-fn default_filename_pattern() -> String {
-    "hyprsnap_%Y%m%d_%H%M%S".to_string()
 }
 
 impl Default for Config {
@@ -339,6 +213,7 @@ fn normalize_path(path: PathBuf) -> PathBuf {
 mod tests {
     use super::*;
     use std::io::Write;
+    use crate::core::config::ui::{default_glyph_all, default_glyph_cancel, default_glyph_crop, default_glyph_monitor, default_glyph_window, default_glyph_size};
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -347,8 +222,6 @@ mod tests {
         f.write_all(content.as_bytes()).expect("write");
         f
     }
-
-    // ── RgbaColor / FreezeColors tests live in src/config/colors.rs ─────────
 
     #[test]
     fn test_default_config_save_path() {
@@ -377,8 +250,6 @@ mod tests {
         assert_eq!(g.cancel, default_glyph_cancel());
     }
 
-    // ── validation ────────────────────────────────────────────────────────────
-
     #[test]
     fn test_validation_accepts_non_empty_pattern() {
         let cfg: Config = toml::from_str("filename_pattern = 'test'").unwrap();
@@ -398,13 +269,10 @@ mod tests {
         assert!(cfg.validate().is_err());
     }
 
-    // ── freeze_glyphs deserialization ─────────────────────────────────────────
-
     #[test]
     fn test_freeze_glyphs_partial_override() {
         let cfg: Config = toml::from_str("[freeze_glyphs]\ncrop = \"X\"").unwrap();
         assert_eq!(cfg.freeze_glyphs.crop, "X");
-        // All unspecified fields fall back to defaults.
         assert_eq!(cfg.freeze_glyphs.window, default_glyph_window());
         assert_eq!(cfg.freeze_glyphs.monitor, default_glyph_monitor());
         assert_eq!(cfg.freeze_glyphs.all, default_glyph_all());
@@ -428,8 +296,6 @@ cancel  = "E"
         assert_eq!(cfg.freeze_glyphs.all, "D");
         assert_eq!(cfg.freeze_glyphs.cancel, "E");
     }
-
-    // ── toolbar_position ──────────────────────────────────────────────────────
 
     #[test]
     fn test_toolbar_position_default_is_top() {
@@ -455,8 +321,6 @@ cancel  = "E"
         let cfg: Config = toml::from_str("").unwrap();
         assert_eq!(cfg.toolbar_position, ToolbarPosition::Top);
     }
-
-    // ── generate_default_toml ─────────────────────────────────────────────────
 
     #[test]
     fn test_generate_default_toml_is_valid_toml() {
@@ -488,8 +352,6 @@ cancel  = "E"
         assert_eq!(parsed.freeze_buttons.cancel, original.freeze_buttons.cancel);
     }
 
-    // ── glyph_size ────────────────────────────────────────────────────────────
-
     #[test]
     fn test_glyph_size_default() {
         assert_eq!(Config::default().freeze_glyphs.size, default_glyph_size());
@@ -500,8 +362,6 @@ cancel  = "E"
         let cfg: Config = toml::from_str("[freeze_glyphs]\nsize = 40.0").unwrap();
         assert!((cfg.freeze_glyphs.size - 40.0).abs() < f32::EPSILON);
     }
-
-    // ── freeze_buttons ────────────────────────────────────────────────────────
 
     #[test]
     fn test_freeze_buttons_all_default_true() {
@@ -542,8 +402,6 @@ cancel  = false
         assert!(!cfg.freeze_buttons.any_visible());
     }
 
-    // ── load_from ─────────────────────────────────────────────────────────────
-
     #[test]
     fn test_load_from_nonexistent_returns_defaults() {
         let cfg = Config::load_from(std::path::Path::new("/nonexistent/path/config.toml"))
@@ -563,7 +421,6 @@ cancel = "Z"
         let cfg = Config::load_from(f.path()).expect("load");
         assert_eq!(cfg.filename_pattern, "snap_%Y");
         assert_eq!(cfg.freeze_glyphs.cancel, "Z");
-        // Unspecified fields still default.
         assert_eq!(cfg.freeze_glyphs.crop, default_glyph_crop());
     }
 
@@ -572,8 +429,6 @@ cancel = "Z"
         let f = write_toml("not valid toml [[[");
         assert!(Config::load_from(f.path()).is_err());
     }
-
-    // ── output helpers ────────────────────────────────────────────────────────
 
     #[test]
     fn test_output_filename_has_png_extension() {
@@ -586,8 +441,6 @@ cancel = "Z"
         let path = cfg.output_path();
         assert_eq!(path.parent().unwrap(), cfg.save_path);
     }
-
-    // ── tilde expansion ───────────────────────────────────────────────────────
 
     #[test]
     fn test_tilde_expansion() {
@@ -602,14 +455,11 @@ cancel = "Z"
             expand_tilde(&PathBuf::from("/tmp/test")),
             PathBuf::from("/tmp/test")
         );
-        // Bare relative path is anchored to $HOME.
         assert_eq!(
             expand_tilde(&PathBuf::from("Screenshots")),
             home.join("Screenshots")
         );
     }
-
-    // ── normalize_path ────────────────────────────────────────────────────────
 
     #[test]
     fn test_normalize_path_dotdot_collapses_normal() {
@@ -621,7 +471,6 @@ cancel = "Z"
 
     #[test]
     fn test_normalize_path_root_dotdot_stays_at_root() {
-        // `/../etc` must not pop the root component – result is `/etc`.
         assert_eq!(
             normalize_path(PathBuf::from("/../etc")),
             PathBuf::from("/etc"),
@@ -630,7 +479,6 @@ cancel = "Z"
 
     #[test]
     fn test_normalize_path_relative_leading_dotdot_preserved() {
-        // Relative leading `..` cannot be resolved without a base, keep them.
         assert_eq!(
             normalize_path(PathBuf::from("../outside")),
             PathBuf::from("../outside"),
@@ -640,15 +488,12 @@ cancel = "Z"
     #[test]
     fn test_expand_tilde_traversal_clamped_to_screenshots() {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        // `~/foo/../../etc` normalises to `/<home_parent>/etc` which is
-        // outside home, so expand_tilde must fall back to ~/Screenshots.
         let result = expand_tilde(&PathBuf::from("~/foo/../../etc"));
         assert_eq!(result, home.join("Screenshots"));
     }
 
     #[test]
     fn test_expand_tilde_absolute_path_is_passed_through() {
-        // An explicit absolute path is never subject to the home-escape guard.
         assert_eq!(
             expand_tilde(&PathBuf::from("/tmp/screenshots")),
             PathBuf::from("/tmp/screenshots"),

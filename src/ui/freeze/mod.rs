@@ -15,11 +15,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::config::Config;
-use crate::error::{AppError, Result};
-use crate::freeze_state;
-use crate::hyprland::{self, ScreenRect};
-use crate::screencopy;
+use crate::backend::capture::screencopy;
+use crate::backend::system::hyprland::{self, ScreenRect};
+use crate::core::config::Config;
+use crate::core::error::{AppError, Result};
+use crate::ui::freeze_state;
 
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
@@ -184,7 +184,10 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     }
 }
 
-fn resolve_initial_mode(buttons: &crate::config::FreezeButtons, saved: CaptureMode) -> CaptureMode {
+fn resolve_initial_mode(
+    buttons: &crate::core::config::FreezeButtons,
+    saved: CaptureMode,
+) -> CaptureMode {
     // Saved mode may reference a button that has since been disabled.
     // Fall back to the first enabled mode so the UI starts in a valid state.
     let saved_enabled = match saved {
