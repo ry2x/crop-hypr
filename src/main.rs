@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use hyprcrop::backend::system::{clipboard, notify};
-use hyprcrop::cli::capture;
+use hyprcrop::commands::capture;
 use hyprcrop::core::config::Config;
 use hyprcrop::core::error::{AppError, Result};
 use hyprcrop::ui::freeze;

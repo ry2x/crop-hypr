@@ -19,6 +19,7 @@ use crate::backend::capture::screencopy;
 use crate::backend::system::hyprland::{self};
 use crate::core::config::Config;
 use crate::core::error::{AppError, Result};
+
 use crate::core::types::ScreenRect;
 
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
@@ -178,7 +179,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                 w: r.w,
                 h: r.h,
             });
-            crop_and_save(full_rgba, adjusted, &out_path)?;
+            screencopy::crop_and_save(full_rgba, adjusted, &out_path)?;
             Ok(out_path)
         }
     }
@@ -212,25 +213,4 @@ fn resolve_initial_mode(
         // toolbar is hidden or cancel-only.
         CaptureMode::Crop
     }
-}
-
-fn crop_and_save(
-    img: ::image::ImageBuffer<::image::Rgba<u8>, Vec<u8>>,
-    region: Option<ScreenRect>,
-    dst: &std::path::Path,
-) -> Result<()> {
-    let cropped = match region {
-        None => ::image::DynamicImage::ImageRgba8(img),
-        Some(r) => {
-            let x = r.x.max(0) as u32;
-            let y = r.y.max(0) as u32;
-            let w = (r.w as u32).min(img.width().saturating_sub(x));
-            let h = (r.h as u32).min(img.height().saturating_sub(y));
-            ::image::DynamicImage::ImageRgba8(
-                ::image::imageops::crop_imm(&img, x, y, w, h).to_image(),
-            )
-        }
-    };
-
-    cropped.save(dst).map_err(AppError::from)
 }

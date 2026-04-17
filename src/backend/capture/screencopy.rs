@@ -727,3 +727,26 @@ pub fn capture_all_monitors_with_physical(
         Ok((physical_images, master_img))
     })
 }
+
+/// Crop an RGBA image buffer to an optional region and save to `dst`.
+/// If `region` is `None`, saves the full image as-is.
+/// Region bounds are clamped to image dimensions.
+pub fn crop_and_save(
+    img: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>,
+    region: Option<crate::core::types::ScreenRect>,
+    dst: &std::path::Path,
+) -> crate::core::error::Result<()> {
+    let cropped = match region {
+        None => image::DynamicImage::ImageRgba8(img),
+        Some(r) => {
+            let x = r.x.max(0) as u32;
+            let y = r.y.max(0) as u32;
+            let w = (r.w as u32).min(img.width().saturating_sub(x));
+            let h = (r.h as u32).min(img.height().saturating_sub(y));
+            image::DynamicImage::ImageRgba8(image::imageops::crop_imm(&img, x, y, w, h).to_image())
+        }
+    };
+    cropped
+        .save(dst)
+        .map_err(crate::core::error::AppError::from)
+}
