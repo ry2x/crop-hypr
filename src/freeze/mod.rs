@@ -48,9 +48,12 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
             CaptureMode::Window
         } else if cfg.freeze_buttons.monitor {
             CaptureMode::Monitor
+        } else if cfg.freeze_buttons.all {
+            CaptureMode::All
         } else {
-            // All buttons disabled — toolbar is hidden; mode is irrelevant.
-            CaptureMode::Crop
+            // All buttons disabled — toolbar is hidden; default to All so the
+            // canvas interaction handler stays inactive (All has no canvas phase).
+            CaptureMode::All
         }
     };
 

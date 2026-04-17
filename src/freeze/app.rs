@@ -517,66 +517,55 @@ impl AppState {
             ToolbarPosition::Left | ToolbarPosition::Right
         );
 
+        let mut children: Vec<Element<'_, Message>> = Vec::new();
+        if self.freeze_buttons.crop {
+            children.push(
+                btn(
+                    &self.glyphs.crop,
+                    CaptureMode::Crop,
+                    self.mode == CaptureMode::Crop,
+                )
+                .into(),
+            );
+        }
+        if self.freeze_buttons.window {
+            children.push(
+                btn(
+                    &self.glyphs.window,
+                    CaptureMode::Window,
+                    self.mode == CaptureMode::Window,
+                )
+                .into(),
+            );
+        }
+        if self.freeze_buttons.monitor {
+            children.push(
+                btn(
+                    &self.glyphs.monitor,
+                    CaptureMode::Monitor,
+                    self.mode == CaptureMode::Monitor,
+                )
+                .into(),
+            );
+        }
+        if self.freeze_buttons.all {
+            children.push(
+                btn(
+                    &self.glyphs.all,
+                    CaptureMode::All,
+                    self.mode == CaptureMode::All,
+                )
+                .into(),
+            );
+        }
+        if self.freeze_buttons.cancel {
+            children.push(cancel_btn.into());
+        }
+
         let buttons: Element<'_, Message> = if vertical {
-            let mut col = Column::new().spacing(8);
-            if self.freeze_buttons.crop {
-                col = col.push(btn(
-                    &self.glyphs.crop,
-                    CaptureMode::Crop,
-                    self.mode == CaptureMode::Crop,
-                ));
-            }
-            if self.freeze_buttons.window {
-                col = col.push(btn(
-                    &self.glyphs.window,
-                    CaptureMode::Window,
-                    self.mode == CaptureMode::Window,
-                ));
-            }
-            if self.freeze_buttons.monitor {
-                col = col.push(btn(
-                    &self.glyphs.monitor,
-                    CaptureMode::Monitor,
-                    self.mode == CaptureMode::Monitor,
-                ));
-            }
-            if self.freeze_buttons.all {
-                col = col.push(btn(&self.glyphs.all, CaptureMode::All, false));
-            }
-            if self.freeze_buttons.cancel {
-                col = col.push(cancel_btn);
-            }
-            col.into()
+            Column::with_children(children).spacing(8).into()
         } else {
-            let mut row = Row::new().spacing(8);
-            if self.freeze_buttons.crop {
-                row = row.push(btn(
-                    &self.glyphs.crop,
-                    CaptureMode::Crop,
-                    self.mode == CaptureMode::Crop,
-                ));
-            }
-            if self.freeze_buttons.window {
-                row = row.push(btn(
-                    &self.glyphs.window,
-                    CaptureMode::Window,
-                    self.mode == CaptureMode::Window,
-                ));
-            }
-            if self.freeze_buttons.monitor {
-                row = row.push(btn(
-                    &self.glyphs.monitor,
-                    CaptureMode::Monitor,
-                    self.mode == CaptureMode::Monitor,
-                ));
-            }
-            if self.freeze_buttons.all {
-                row = row.push(btn(&self.glyphs.all, CaptureMode::All, false));
-            }
-            if self.freeze_buttons.cancel {
-                row = row.push(cancel_btn);
-            }
-            row.into()
+            Row::with_children(children).spacing(8).into()
         };
 
         let toolbar_bg = self.colors.toolbar.background;
