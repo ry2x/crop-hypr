@@ -1,4 +1,5 @@
 use crate::core::error::{AppError, Result};
+use crate::core::types::MonitorInfo;
 
 /// Parse a slurp geometry string (`"X,Y WxH"`) into `(x, y, w, h)`.
 ///
@@ -38,6 +39,17 @@ pub fn parse_slurp_geometry(geom: &str) -> Result<(i32, i32, u32, u32)> {
     Ok((x, y, w, h))
 }
 
+/// Compute the global logical origin (min_x, min_y) across all monitors.
+///
+/// `capture_all_monitors` places this point at image pixel (0, 0).
+/// Subtract this origin from global logical coordinates to get image-space coordinates.
+/// Returns `(0, 0)` if the slice is empty.
+pub fn monitor_origin(monitors: &[MonitorInfo]) -> (i32, i32) {
+    let min_x = monitors.iter().map(|m| m.rect.x).min().unwrap_or(0);
+    let min_y = monitors.iter().map(|m| m.rect.y).min().unwrap_or(0);
+    (min_x, min_y)
+}
+
 /// Clamp a crop rectangle to image bounds.
 ///
 /// Returns `(clamped_w, clamped_h, was_clamped)`.
@@ -65,6 +77,41 @@ pub fn logical_to_physical(logical: u32, scale: f64) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_monitor_origin() {
+        use crate::core::types::{MonitorInfo, ScreenRect};
+        let monitors = vec![
+            MonitorInfo {
+                rect: ScreenRect {
+                    x: -1920,
+                    y: 0,
+                    w: 1920,
+                    h: 1080,
+                },
+                name: "DP-2".to_string(),
+                focused: false,
+                active_workspace_id: 2,
+            },
+            MonitorInfo {
+                rect: ScreenRect {
+                    x: 0,
+                    y: 0,
+                    w: 2560,
+                    h: 1440,
+                },
+                name: "DP-1".to_string(),
+                focused: true,
+                active_workspace_id: 1,
+            },
+        ];
+        assert_eq!(monitor_origin(&monitors), (-1920, 0));
+    }
+
+    #[test]
+    fn test_monitor_origin_empty() {
+        assert_eq!(monitor_origin(&[]), (0, 0));
+    }
 
     #[test]
     fn test_parse_slurp_geometry() {

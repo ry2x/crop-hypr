@@ -8,7 +8,9 @@ use crate::backend::system::cmd::CMD_SLURP;
 use crate::backend::system::hyprland;
 use crate::core::config::Config;
 use crate::core::error::{AppError, Result};
-use crate::core::geometry::{clamp_crop, logical_to_physical, parse_slurp_geometry};
+use crate::core::geometry::{
+    clamp_crop, logical_to_physical, monitor_origin, parse_slurp_geometry,
+};
 
 fn slurp_region() -> Result<String> {
     let output = Command::new(CMD_SLURP)
@@ -50,8 +52,7 @@ pub fn capture_crop(cfg: &Config) -> Result<PathBuf> {
     // Slurp returns global logical coordinates, so we must subtract the origin
     // to get image-space coordinates. This matters for multi-monitor layouts
     // where some monitors sit at negative logical positions.
-    let min_x = monitors.iter().map(|m| m.rect.x).min().unwrap_or(0);
-    let min_y = monitors.iter().map(|m| m.rect.y).min().unwrap_or(0);
+    let (min_x, min_y) = monitor_origin(&monitors);
     let x = (slurp_x - min_x).max(0) as u32;
     let y = (slurp_y - min_y).max(0) as u32;
     if slurp_x < min_x || slurp_y < min_y {

@@ -15,11 +15,8 @@ pub enum AppError {
     #[error("Hyprland IPC environment variable {0} error: {1}")]
     HyprlandEnvVar(&'static str, #[source] std::env::VarError),
 
-    #[error("Failed to parse JSON from {0}: {1}")]
-    HyprlandJson(String, #[source] serde_json::Error),
-
-    #[error("Failed to parse JSON: {0}")]
-    JsonParse(#[from] serde_json::Error),
+    #[error("JSON parse error in {0}: {1}")]
+    JsonParse(String, #[source] serde_json::Error),
 
     #[error("Invalid configuration: {0}")]
     Config(String),

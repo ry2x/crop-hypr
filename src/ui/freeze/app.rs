@@ -15,14 +15,12 @@ use iced::{
     },
 };
 
-use crate::backend::system::hyprland::{
-    BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo,
-};
 use crate::core::config::{
     CropFrameColors, FreezeButtons, FreezeColors, FreezeGlyphs, MonitorFrameColors, RgbaColor,
     ToolbarPosition, WindowFrameColors,
 };
-use crate::ui::freeze_state;
+pub use crate::core::state::CaptureMode;
+use crate::core::types::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
 
@@ -36,16 +34,6 @@ pub enum Message {
     /// triggers another frame). Decrements `repaint_ticks` until zero.
     Tick,
     Cancel,
-}
-
-// ── Mode ──────────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CaptureMode {
-    Crop,
-    Window,
-    Monitor,
-    All,
 }
 
 // ── Hovered target (Window mode distinguishes windows from layer surfaces) ────
@@ -371,7 +359,7 @@ impl AppState {
             }
             Message::ModeSelected(mode) => {
                 self.mode = mode;
-                freeze_state::save_last_mode(mode);
+                crate::core::state::save_last_mode(mode);
             }
             Message::SelectionConfirmed(rect) => {
                 *self.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(Some(rect));

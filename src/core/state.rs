@@ -1,6 +1,17 @@
 use std::{fs, path::PathBuf};
 
-use crate::ui::freeze::CaptureMode;
+// ── CaptureMode ───────────────────────────────────────────────────────────────
+
+/// The active capture mode in the freeze-mode overlay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureMode {
+    Crop,
+    Window,
+    Monitor,
+    All,
+}
+
+// ── State persistence ─────────────────────────────────────────────────────────
 
 /// Returns `$XDG_STATE_HOME/hyprcrop/last_mode`
 /// (falls back to `~/.local/state/hyprcrop/last_mode`).

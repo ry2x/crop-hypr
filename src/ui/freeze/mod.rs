@@ -16,10 +16,10 @@ use std::{
 };
 
 use crate::backend::capture::screencopy;
-use crate::backend::system::hyprland::{self, ScreenRect};
+use crate::backend::system::hyprland::{self};
 use crate::core::config::Config;
 use crate::core::error::{AppError, Result};
-use crate::ui::freeze_state;
+use crate::core::types::ScreenRect;
 
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
@@ -30,7 +30,8 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     } else {
         hyprland::BorderStyle::default()
     };
-    let initial_mode = resolve_initial_mode(&cfg.freeze_buttons, freeze_state::load_last_mode());
+    let initial_mode =
+        resolve_initial_mode(&cfg.freeze_buttons, crate::core::state::load_last_mode());
 
     let monitors_raw = monitors_t
         .join()
@@ -56,8 +57,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     // Compute origin before monitors are moved into Arc.
     // capture_all_monitors places (min_x, min_y) at image pixel (0,0); we need this
     // to translate the UI's global logical coordinates into image coordinates later.
-    let min_x = monitors.iter().map(|m| m.rect.x).min().unwrap_or(0);
-    let min_y = monitors.iter().map(|m| m.rect.y).min().unwrap_or(0);
+    let (min_x, min_y) = crate::core::geometry::monitor_origin(&monitors);
 
     // Capture all monitors in a single Wayland session.
     // Using one session guarantees the overlay images and the final-crop source are
