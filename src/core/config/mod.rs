@@ -3,10 +3,19 @@ pub use colors::{
     ButtonColors, CancelButtonColors, CropFrameColors, FreezeColors, MonitorFrameColors,
     OverlayColors, RgbaColor, ToolbarColors, WindowFrameColors,
 };
-pub mod general;
-pub use general::{
-    default_capture_window_border, default_filename_pattern, default_save_path,
-};
+pub fn default_capture_window_border() -> bool {
+    false
+}
+
+pub fn default_save_path() -> PathBuf {
+    dirs::picture_dir()
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")))
+        .join("Screenshots")
+}
+
+pub fn default_filename_pattern() -> String {
+    "hyprsnap_%Y%m%d_%H%M%S".to_string()
+}
 pub mod notifications;
 pub use notifications::Notifications;
 pub mod ui;
@@ -212,8 +221,11 @@ fn normalize_path(path: PathBuf) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::config::ui::{
+        default_glyph_all, default_glyph_cancel, default_glyph_crop, default_glyph_monitor,
+        default_glyph_size, default_glyph_window,
+    };
     use std::io::Write;
-    use crate::core::config::ui::{default_glyph_all, default_glyph_cancel, default_glyph_crop, default_glyph_monitor, default_glyph_window, default_glyph_size};
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
