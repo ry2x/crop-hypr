@@ -104,9 +104,19 @@ impl Default for FreezeButtons {
 }
 
 impl FreezeButtons {
-    /// Returns `true` if at least one button is enabled.
+    /// Returns `true` if at least one button (including cancel) is enabled.
     pub fn any_visible(&self) -> bool {
         self.crop || self.window || self.monitor || self.all || self.cancel
+    }
+
+    /// Returns `true` if at least one *capture-mode* button is enabled.
+    ///
+    /// When this returns `false` (all of crop/window/monitor/all are disabled),
+    /// freeze mode falls back to `Crop` canvas selection so the user can still
+    /// drag-select a region even without toolbar buttons. The `cancel` button is
+    /// excluded because it does not initiate a capture.
+    pub fn any_capture_enabled(&self) -> bool {
+        self.crop || self.window || self.monitor || self.all
     }
 }
 

@@ -517,7 +517,7 @@ impl AppState {
             ToolbarPosition::Left | ToolbarPosition::Right
         );
 
-        let mut children: Vec<Element<'_, Message>> = Vec::new();
+        let mut children: Vec<Element<'_, Message>> = Vec::with_capacity(5);
         if self.freeze_buttons.crop {
             children.push(
                 btn(
