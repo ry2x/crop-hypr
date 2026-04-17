@@ -72,7 +72,7 @@ pub struct FreezeButtons {
     pub cancel: bool,
 }
 
-pub fn default_true() -> bool {
+fn default_true() -> bool {
     true
 }
 

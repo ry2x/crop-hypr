@@ -1,26 +1,3 @@
-pub mod colors;
-pub use colors::{
-    ButtonColors, CancelButtonColors, CropFrameColors, FreezeColors, MonitorFrameColors,
-    OverlayColors, RgbaColor, ToolbarColors, WindowFrameColors,
-};
-pub fn default_capture_window_border() -> bool {
-    false
-}
-
-pub fn default_save_path() -> PathBuf {
-    dirs::picture_dir()
-        .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")))
-        .join("Screenshots")
-}
-
-pub fn default_filename_pattern() -> String {
-    "hyprsnap_%Y%m%d_%H%M%S".to_string()
-}
-pub mod notifications;
-pub use notifications::Notifications;
-pub mod ui;
-pub use ui::{FreezeButtons, FreezeGlyphs, ToolbarPosition};
-
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -29,6 +6,32 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::core::error::{AppError, Result};
+
+pub mod colors;
+pub use colors::{
+    ButtonColors, CancelButtonColors, CropFrameColors, FreezeColors, MonitorFrameColors,
+    OverlayColors, RgbaColor, ToolbarColors, WindowFrameColors,
+};
+
+pub mod freeze;
+pub use freeze::{FreezeButtons, FreezeGlyphs, ToolbarPosition};
+
+pub mod notifications;
+pub use notifications::Notifications;
+
+fn default_capture_window_border() -> bool {
+    false
+}
+
+fn default_save_path() -> PathBuf {
+    dirs::picture_dir()
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")))
+        .join("Screenshots")
+}
+
+fn default_filename_pattern() -> String {
+    "hyprsnap_%Y%m%d_%H%M%S".to_string()
+}
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -221,7 +224,7 @@ fn normalize_path(path: PathBuf) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::config::ui::{
+    use crate::core::config::freeze::{
         default_glyph_all, default_glyph_cancel, default_glyph_crop, default_glyph_monitor,
         default_glyph_size, default_glyph_window,
     };
