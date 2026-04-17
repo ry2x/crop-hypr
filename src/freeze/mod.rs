@@ -30,7 +30,29 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     } else {
         hyprland::BorderStyle::default()
     };
-    let initial_mode = freeze_state::load_last_mode();
+    let initial_mode = {
+        let m = freeze_state::load_last_mode();
+        // Saved mode may reference a button that has since been disabled.
+        // Fall back to the first enabled mode so the UI starts in a valid state.
+        let enabled = match m {
+            CaptureMode::Crop => cfg.freeze_buttons.crop,
+            CaptureMode::Window => cfg.freeze_buttons.window,
+            CaptureMode::Monitor => cfg.freeze_buttons.monitor,
+            CaptureMode::All => cfg.freeze_buttons.all,
+        };
+        if enabled {
+            m
+        } else if cfg.freeze_buttons.crop {
+            CaptureMode::Crop
+        } else if cfg.freeze_buttons.window {
+            CaptureMode::Window
+        } else if cfg.freeze_buttons.monitor {
+            CaptureMode::Monitor
+        } else {
+            // All buttons disabled — toolbar is hidden; mode is irrelevant.
+            CaptureMode::Crop
+        }
+    };
 
     let monitors_raw = monitors_t
         .join()
