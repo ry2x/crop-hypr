@@ -31,6 +31,9 @@ pub struct FreezeGlyphs {
     pub all: String,
     #[serde(default = "default_glyph_cancel")]
     pub cancel: String,
+    /// Text size (in pixels) of the glyph inside each toolbar button.
+    #[serde(default = "default_glyph_size")]
+    pub size: f32,
 }
 
 fn default_glyph_crop() -> String {
@@ -48,6 +51,9 @@ fn default_glyph_all() -> String {
 fn default_glyph_cancel() -> String {
     "\u{F05AD}".to_string()
 }
+fn default_glyph_size() -> f32 {
+    26.0
+}
 
 impl Default for FreezeGlyphs {
     fn default() -> Self {
@@ -57,7 +63,60 @@ impl Default for FreezeGlyphs {
             monitor: default_glyph_monitor(),
             all: default_glyph_all(),
             cancel: default_glyph_cancel(),
+            size: default_glyph_size(),
         }
+    }
+}
+
+// ── Toolbar button visibility ─────────────────────────────────────────────────
+
+/// Controls which buttons are visible in the freeze-mode toolbar.
+/// Buttons set to `false` are omitted entirely; if all are `false`, the
+/// toolbar container is not rendered.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct FreezeButtons {
+    #[serde(default = "default_true")]
+    pub crop: bool,
+    #[serde(default = "default_true")]
+    pub window: bool,
+    #[serde(default = "default_true")]
+    pub monitor: bool,
+    #[serde(default = "default_true")]
+    pub all: bool,
+    #[serde(default = "default_true")]
+    pub cancel: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for FreezeButtons {
+    fn default() -> Self {
+        Self {
+            crop: true,
+            window: true,
+            monitor: true,
+            all: true,
+            cancel: true,
+        }
+    }
+}
+
+impl FreezeButtons {
+    /// Returns `true` if at least one button (including cancel) is enabled.
+    pub fn any_visible(&self) -> bool {
+        self.crop || self.window || self.monitor || self.all || self.cancel
+    }
+
+    /// Returns `true` if at least one *capture-mode* button is enabled.
+    ///
+    /// When this returns `false` (all of crop/window/monitor/all are disabled),
+    /// freeze mode falls back to `Crop` canvas selection so the user can still
+    /// drag-select a region even without toolbar buttons. The `cancel` button is
+    /// excluded because it does not initiate a capture.
+    pub fn any_capture_enabled(&self) -> bool {
+        self.crop || self.window || self.monitor || self.all
     }
 }
 
@@ -103,6 +162,11 @@ pub struct Config {
     /// All keys are optional; omitted keys fall back to the built-in defaults.
     #[serde(default)]
     pub freeze_colors: FreezeColors,
+
+    /// Controls which buttons are shown in the freeze-mode toolbar.
+    /// Buttons set to `false` are omitted; if all are `false`, the toolbar is hidden.
+    #[serde(default)]
+    pub freeze_buttons: FreezeButtons,
 }
 
 fn default_capture_window_border() -> bool {
@@ -129,6 +193,7 @@ impl Default for Config {
             capture_window_border: default_capture_window_border(),
             notifications: Notifications::default(),
             freeze_colors: FreezeColors::default(),
+            freeze_buttons: FreezeButtons::default(),
         }
     }
 }
@@ -411,7 +476,70 @@ cancel  = "E"
         assert_eq!(parsed.freeze_glyphs.monitor, original.freeze_glyphs.monitor);
         assert_eq!(parsed.freeze_glyphs.all, original.freeze_glyphs.all);
         assert_eq!(parsed.freeze_glyphs.cancel, original.freeze_glyphs.cancel);
+        assert_eq!(parsed.freeze_glyphs.size, original.freeze_glyphs.size);
         assert_eq!(parsed.toolbar_position, original.toolbar_position);
+        assert_eq!(parsed.freeze_buttons.crop, original.freeze_buttons.crop);
+        assert_eq!(parsed.freeze_buttons.window, original.freeze_buttons.window);
+        assert_eq!(
+            parsed.freeze_buttons.monitor,
+            original.freeze_buttons.monitor
+        );
+        assert_eq!(parsed.freeze_buttons.all, original.freeze_buttons.all);
+        assert_eq!(parsed.freeze_buttons.cancel, original.freeze_buttons.cancel);
+    }
+
+    // ── glyph_size ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_glyph_size_default() {
+        assert_eq!(Config::default().freeze_glyphs.size, default_glyph_size());
+    }
+
+    #[test]
+    fn test_glyph_size_override() {
+        let cfg: Config = toml::from_str("[freeze_glyphs]\nsize = 40.0").unwrap();
+        assert!((cfg.freeze_glyphs.size - 40.0).abs() < f32::EPSILON);
+    }
+
+    // ── freeze_buttons ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_freeze_buttons_all_default_true() {
+        let b = FreezeButtons::default();
+        assert!(b.crop && b.window && b.monitor && b.all && b.cancel);
+        assert!(b.any_visible());
+    }
+
+    #[test]
+    fn test_freeze_buttons_missing_section_defaults_to_all_true() {
+        let cfg: Config = toml::from_str("").unwrap();
+        let b = cfg.freeze_buttons;
+        assert!(b.crop && b.window && b.monitor && b.all && b.cancel);
+    }
+
+    #[test]
+    fn test_freeze_buttons_partial_override() {
+        let cfg: Config = toml::from_str("[freeze_buttons]\ncrop = false\nall = false").unwrap();
+        assert!(!cfg.freeze_buttons.crop);
+        assert!(cfg.freeze_buttons.window);
+        assert!(cfg.freeze_buttons.monitor);
+        assert!(!cfg.freeze_buttons.all);
+        assert!(cfg.freeze_buttons.cancel);
+        assert!(cfg.freeze_buttons.any_visible());
+    }
+
+    #[test]
+    fn test_freeze_buttons_all_false_not_visible() {
+        let toml = r#"
+[freeze_buttons]
+crop    = false
+window  = false
+monitor = false
+all     = false
+cancel  = false
+"#;
+        let cfg: Config = toml::from_str(toml).unwrap();
+        assert!(!cfg.freeze_buttons.any_visible());
     }
 
     // ── load_from ─────────────────────────────────────────────────────────────

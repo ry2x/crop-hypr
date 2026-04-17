@@ -11,7 +11,7 @@ A fast, Hyprland-native screenshot tool written in Rust.
 - **Freeze mode** — freeze the screen and interactively select what to capture via an overlay UI (similar to Windows Win+Shift+S Clipping Tool)
 - Automatic clipboard copy via `wl-copy`
 - Desktop notification on success/failure
-- Configurable save path, filename pattern, freeze toolbar glyphs, toolbar position, window border inclusion, and full UI color theming
+- Configurable save path, filename pattern, freeze toolbar glyphs (including size), toolbar position, per-button visibility, window border inclusion, and full UI color theming
 
 ## Requirements
 
@@ -139,7 +139,7 @@ toolbar_position = "top"
 # `general:border_size` on each side. The freeze-mode overlay also draws
 # rounded highlight frames matching `decoration:rounding`.
 # Default: false
-# capture_window_border = false
+capture_window_border = false
 
 # Glyphs shown in the freeze mode toolbar.
 # Requires a Nerd Font. Override individual icons as needed.
@@ -149,6 +149,18 @@ window  = ""
 monitor = "󰍹"
 all     = "󰁌"
 cancel  = "󰖭"
+# size = 26.0  # glyph text size inside toolbar buttons (pixels)
+
+# Controls which buttons are visible in the freeze mode toolbar.
+# Set any button to false to hide it. If all capture-mode buttons (crop/window/monitor/all)
+# are false, freeze mode defaults to Crop canvas selection (drag-to-select still works);
+# the toolbar is hidden unless cancel = true.
+[freeze_buttons]
+crop    = true
+window  = true
+monitor = true
+all     = true
+cancel  = true
 
 # ── Notifications ─────────────────────────────────────────────────────────────
 # Variables: {path} = saved file path (success_summary, success_body, success_action); {error} = error message (error_summary, error_body).
@@ -227,6 +239,12 @@ error_body       = "{error}"
 | `freeze_glyphs.monitor`                        | string       | `󰍹` (U+F0379)                                                     | Toolbar icon for monitor mode                                                                   |
 | `freeze_glyphs.all`                            | string       | `󰁌` (U+F004C)                                                     | Toolbar icon for all-monitors mode                                                              |
 | `freeze_glyphs.cancel`                         | string       | `󰖭` (U+F05AD)                                                     | Toolbar icon for cancel button                                                                  |
+| `freeze_glyphs.size`                           | float        | `26.0`                                                                    | Glyph text size (px) inside toolbar buttons                                                     |
+| `freeze_buttons.crop`                          | bool         | `true`                                                                    | Show the Crop button in the toolbar                                                             |
+| `freeze_buttons.window`                        | bool         | `true`                                                                    | Show the Window button in the toolbar                                                           |
+| `freeze_buttons.monitor`                       | bool         | `true`                                                                    | Show the Monitor button in the toolbar                                                          |
+| `freeze_buttons.all`                           | bool         | `true`                                                                    | Show the All button in the toolbar                                                              |
+| `freeze_buttons.cancel`                        | bool         | `true`                                                                    | Show the Cancel button in the toolbar. If all capture-mode buttons are `false`, freeze defaults to Crop canvas selection; toolbar hidden unless cancel is `true` |
 | `freeze_colors.overlay.background`             | string (hex) | `"#00000059"`                                                     | Dim fill over frozen screen                                                                     |
 | `freeze_colors.toolbar.background`             | string (hex) | `"#141414D9"`                                                     | Toolbar pill background                                                                         |
 | `freeze_colors.button.idle_background`         | string (hex) | `"#797A7DFF"`                                                     | Mode button — unselected background                                                             |

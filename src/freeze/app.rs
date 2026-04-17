@@ -16,8 +16,8 @@ use iced::{
 };
 
 use crate::config::{
-    CropFrameColors, FreezeColors, FreezeGlyphs, MonitorFrameColors, RgbaColor, ToolbarPosition,
-    WindowFrameColors,
+    CropFrameColors, FreezeButtons, FreezeColors, FreezeGlyphs, MonitorFrameColors, RgbaColor,
+    ToolbarPosition, WindowFrameColors,
 };
 use crate::freeze_state;
 use crate::hyprland::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
@@ -312,6 +312,7 @@ pub struct AppStateConfig {
     pub border_style: BorderStyle,
     pub initial_mode: CaptureMode,
     pub colors: FreezeColors,
+    pub freeze_buttons: FreezeButtons,
 }
 
 pub struct AppState {
@@ -337,6 +338,7 @@ pub struct AppState {
     toolbar_position: ToolbarPosition,
     border_style: BorderStyle,
     colors: FreezeColors,
+    freeze_buttons: FreezeButtons,
 }
 
 impl AppState {
@@ -355,6 +357,7 @@ impl AppState {
             toolbar_position: cfg.toolbar_position,
             border_style: cfg.border_style,
             colors: cfg.colors,
+            freeze_buttons: cfg.freeze_buttons,
         }
     }
 
@@ -415,23 +418,7 @@ impl AppState {
 
         let toolbar = self.toolbar();
 
-        let positioned_toolbar: Element<'_, Message> = Container::new(toolbar)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(12)
-            .align_x(match self.toolbar_position {
-                ToolbarPosition::Left => iced::alignment::Horizontal::Left,
-                ToolbarPosition::Right => iced::alignment::Horizontal::Right,
-                _ => iced::alignment::Horizontal::Center,
-            })
-            .align_y(match self.toolbar_position {
-                ToolbarPosition::Top => iced::alignment::Vertical::Top,
-                ToolbarPosition::Bottom => iced::alignment::Vertical::Bottom,
-                _ => iced::alignment::Vertical::Center,
-            })
-            .into();
-
-        stack![
+        let base_stack = stack![
             Image::new(self.monitor_images[mon_idx].clone())
                 .width(Length::Fill)
                 .height(Length::Fill)
@@ -439,12 +426,37 @@ impl AppState {
             Canvas::new(canvas_prog)
                 .width(Length::Fill)
                 .height(Length::Fill),
-            positioned_toolbar,
-        ]
-        .into()
+        ];
+
+        if let Some(tb) = toolbar {
+            let positioned_toolbar: Element<'_, Message> = Container::new(tb)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .padding(12)
+                .align_x(match self.toolbar_position {
+                    ToolbarPosition::Left => iced::alignment::Horizontal::Left,
+                    ToolbarPosition::Right => iced::alignment::Horizontal::Right,
+                    _ => iced::alignment::Horizontal::Center,
+                })
+                .align_y(match self.toolbar_position {
+                    ToolbarPosition::Top => iced::alignment::Vertical::Top,
+                    ToolbarPosition::Bottom => iced::alignment::Vertical::Bottom,
+                    _ => iced::alignment::Vertical::Center,
+                })
+                .into();
+            base_stack.push(positioned_toolbar).into()
+        } else {
+            base_stack.into()
+        }
     }
 
-    fn toolbar(&self) -> Element<'_, Message> {
+    /// Builds the toolbar widget, or returns `None` if all buttons are disabled.
+    fn toolbar(&self) -> Option<Element<'_, Message>> {
+        if !self.freeze_buttons.any_visible() {
+            return None;
+        }
+
+        let glyph_size = self.glyphs.size;
         let btn = |label: &str, mode: CaptureMode, active: bool| {
             let btn_colors = self.colors.button;
             let (base_bg, base_text) = if active {
@@ -454,7 +466,7 @@ impl AppState {
             };
             let hover_bg = btn_colors.hover_background;
             let hover_text = btn_colors.hover_text;
-            button(Text::new(label.to_owned()).size(26))
+            button(Text::new(label.to_owned()).size(glyph_size))
                 .on_press(Message::ModeSelected(mode))
                 .style(move |_theme, status| {
                     let (bg, text) = match status {
@@ -480,7 +492,7 @@ impl AppState {
             let idle_text = cancel_colors.idle_text;
             let hover_bg = cancel_colors.hover_background;
             let hover_text = cancel_colors.hover_text;
-            button(Text::new(self.glyphs.cancel.as_str()).size(26))
+            button(Text::new(self.glyphs.cancel.as_str()).size(glyph_size))
                 .on_press(Message::Cancel)
                 .style(move |_theme, status| {
                     let (bg, text) = match status {
@@ -505,62 +517,71 @@ impl AppState {
             ToolbarPosition::Left | ToolbarPosition::Right
         );
 
+        let mut children: Vec<Element<'_, Message>> = Vec::with_capacity(5);
+        if self.freeze_buttons.crop {
+            children.push(
+                btn(
+                    &self.glyphs.crop,
+                    CaptureMode::Crop,
+                    self.mode == CaptureMode::Crop,
+                )
+                .into(),
+            );
+        }
+        if self.freeze_buttons.window {
+            children.push(
+                btn(
+                    &self.glyphs.window,
+                    CaptureMode::Window,
+                    self.mode == CaptureMode::Window,
+                )
+                .into(),
+            );
+        }
+        if self.freeze_buttons.monitor {
+            children.push(
+                btn(
+                    &self.glyphs.monitor,
+                    CaptureMode::Monitor,
+                    self.mode == CaptureMode::Monitor,
+                )
+                .into(),
+            );
+        }
+        if self.freeze_buttons.all {
+            children.push(
+                btn(
+                    &self.glyphs.all,
+                    CaptureMode::All,
+                    self.mode == CaptureMode::All,
+                )
+                .into(),
+            );
+        }
+        if self.freeze_buttons.cancel {
+            children.push(cancel_btn.into());
+        }
+
         let buttons: Element<'_, Message> = if vertical {
-            Column::new()
-                .spacing(8)
-                .push(btn(
-                    &self.glyphs.crop,
-                    CaptureMode::Crop,
-                    self.mode == CaptureMode::Crop,
-                ))
-                .push(btn(
-                    &self.glyphs.window,
-                    CaptureMode::Window,
-                    self.mode == CaptureMode::Window,
-                ))
-                .push(btn(
-                    &self.glyphs.monitor,
-                    CaptureMode::Monitor,
-                    self.mode == CaptureMode::Monitor,
-                ))
-                .push(btn(&self.glyphs.all, CaptureMode::All, false))
-                .push(cancel_btn)
-                .into()
+            Column::with_children(children).spacing(8).into()
         } else {
-            Row::new()
-                .spacing(8)
-                .push(btn(
-                    &self.glyphs.crop,
-                    CaptureMode::Crop,
-                    self.mode == CaptureMode::Crop,
-                ))
-                .push(btn(
-                    &self.glyphs.window,
-                    CaptureMode::Window,
-                    self.mode == CaptureMode::Window,
-                ))
-                .push(btn(
-                    &self.glyphs.monitor,
-                    CaptureMode::Monitor,
-                    self.mode == CaptureMode::Monitor,
-                ))
-                .push(btn(&self.glyphs.all, CaptureMode::All, false))
-                .push(cancel_btn)
-                .into()
+            Row::with_children(children).spacing(8).into()
         };
 
         let toolbar_bg = self.colors.toolbar.background;
-        Container::new(buttons)
-            .style(move |_theme| iced::widget::container::Style {
-                background: Some(iced::Background::Color(to_iced(toolbar_bg))),
-                border: iced::Border {
-                    radius: 12.0.into(),
+        Some(
+            Container::new(buttons)
+                .style(move |_theme| iced::widget::container::Style {
+                    background: Some(iced::Background::Color(to_iced(toolbar_bg))),
+                    border: iced::Border {
+                        radius: 12.0.into(),
+                        ..Default::default()
+                    },
                     ..Default::default()
-                },
-                ..Default::default()
-            })
-            .padding([8, 14])
-            .into()
+                })
+                .padding([8, 14])
+                .into(),
+        )
     }
 
     pub fn subscription(&self) -> Subscription<Message> {

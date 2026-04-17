@@ -30,7 +30,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     } else {
         hyprland::BorderStyle::default()
     };
-    let initial_mode = freeze_state::load_last_mode();
+    let initial_mode = resolve_initial_mode(&cfg.freeze_buttons, freeze_state::load_last_mode());
 
     let monitors_raw = monitors_t
         .join()
@@ -113,6 +113,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         let glyphs = cfg.freeze_glyphs.clone();
         let toolbar_position = cfg.toolbar_position;
         let colors = cfg.freeze_colors;
+        let freeze_buttons = cfg.freeze_buttons;
 
         iced_layershell::daemon(
             move || {
@@ -139,6 +140,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                     border_style,
                     initial_mode,
                     colors,
+                    freeze_buttons,
                 });
                 (state, Task::batch(spawn_tasks))
             },
@@ -179,6 +181,33 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
             crop_and_save(full_rgba, adjusted, &out_path)?;
             Ok(out_path)
         }
+    }
+}
+
+fn resolve_initial_mode(buttons: &crate::config::FreezeButtons, saved: CaptureMode) -> CaptureMode {
+    // Saved mode may reference a button that has since been disabled.
+    // Fall back to the first enabled mode so the UI starts in a valid state.
+    let saved_enabled = match saved {
+        CaptureMode::Crop => buttons.crop,
+        CaptureMode::Window => buttons.window,
+        CaptureMode::Monitor => buttons.monitor,
+        CaptureMode::All => buttons.all,
+    };
+    if saved_enabled {
+        saved
+    } else if buttons.crop {
+        CaptureMode::Crop
+    } else if buttons.window {
+        CaptureMode::Window
+    } else if buttons.monitor {
+        CaptureMode::Monitor
+    } else if buttons.all {
+        CaptureMode::All
+    } else {
+        // All capture-mode buttons are disabled; default to Crop so canvas
+        // interactions (drag-to-select region) remain available even when the
+        // toolbar is hidden or cancel-only.
+        CaptureMode::Crop
     }
 }
 
