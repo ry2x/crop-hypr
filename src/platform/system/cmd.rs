@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::process::{Command, Stdio};
 
-use crate::core::error::{AppError, Result};
+use crate::domain::error::{AppError, Result};
 
 pub const CMD_SLURP: &str = "slurp";
 pub const CMD_WL_COPY: &str = "wl-copy";

@@ -1,4 +1,17 @@
-pub mod backend;
+//! # hyprcrop
+//!
+//! A Hyprland-native screenshot tool.
+//!
+//! ## Module layout
+//!
+//! | Module | Responsibility |
+//! |---|---|
+//! | [`domain`] | Shared data types, configuration, and error definitions used across the entire application |
+//! | [`platform`] | I/O adapters for OS/Wayland (screencopy, clipboard, Hyprland IPC) |
+//! | [`commands`] | CLI subcommand implementations (`crop` / `window` / `monitor` / `all` / `freeze`) |
+//! | [`ui`] | Interactive overlay UI for freeze mode (iced_layershell) |
+
 pub mod commands;
-pub mod core;
+pub mod domain;
+pub mod platform;
 pub mod ui;

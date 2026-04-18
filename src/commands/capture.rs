@@ -3,14 +3,14 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::backend::capture::screencopy;
-use crate::backend::system::cmd::CMD_SLURP;
-use crate::backend::system::hyprland;
-use crate::core::config::Config;
-use crate::core::error::{AppError, Result};
-use crate::core::geometry::{
+use crate::domain::config::Config;
+use crate::domain::error::{AppError, Result};
+use crate::domain::geometry::{
     clamp_crop, logical_to_physical, monitor_origin, parse_slurp_geometry,
 };
+use crate::platform::capture::screencopy;
+use crate::platform::system::cmd::CMD_SLURP;
+use crate::platform::system::hyprland;
 
 fn slurp_region() -> Result<String> {
     let output = Command::new(CMD_SLURP)
@@ -168,7 +168,7 @@ pub fn capture_monitor(cfg: &Config) -> Result<PathBuf> {
 }
 
 pub fn capture_portal(cfg: &Config) -> Result<PathBuf> {
-    crate::backend::capture::portal::capture(cfg)
+    crate::platform::capture::portal::capture(cfg)
 }
 
 pub fn capture_all(cfg: &Config) -> Result<PathBuf> {

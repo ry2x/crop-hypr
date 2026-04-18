@@ -15,12 +15,12 @@ use iced::{
     },
 };
 
-use crate::core::config::{
+use crate::domain::config::{
     CropFrameColors, FreezeButtons, FreezeColors, FreezeGlyphs, MonitorFrameColors, RgbaColor,
     ToolbarPosition, WindowFrameColors,
 };
-pub use crate::core::state::CaptureMode;
-use crate::core::types::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
+pub use crate::domain::state::CaptureMode;
+use crate::domain::types::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
 
 // ── Message ───────────────────────────────────────────────────────────────────
 
@@ -359,7 +359,7 @@ impl AppState {
             }
             Message::ModeSelected(mode) => {
                 self.mode = mode;
-                crate::core::state::save_last_mode(mode);
+                crate::domain::state::save_last_mode(mode);
             }
             Message::SelectionConfirmed(rect) => {
                 *self.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(Some(rect));

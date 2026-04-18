@@ -1,3 +1,16 @@
+//! # domain::types
+//!
+//! Shared data structures used across multiple modules.
+//! External dependencies are minimal — `serde` only.
+//!
+//! | Type | Purpose |
+//! |---|---|
+//! | `ScreenRect` | Rectangular region in logical pixel coordinates |
+//! | `WindowInfo` | Hyprland window metadata |
+//! | `MonitorInfo` | Hyprland monitor metadata |
+//! | `BorderStyle` | Hyprland `border_size` and `rounding` values |
+//! | `LayerSurface` | Wayland layer-shell surface descriptor |
+
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, Deserialize)]

@@ -1,5 +1,16 @@
-use crate::core::error::{AppError, Result};
-use crate::core::types::MonitorInfo;
+//! # domain::geometry
+//!
+//! Pure coordinate transformation and parsing — no side effects.
+//!
+//! | Function | Description |
+//! |---|---|
+//! | `parse_slurp_geometry` | Parses the `"X,Y WxH"` string returned by `slurp` into numeric values |
+//! | `monitor_origin` | Finds the minimum (x, y) across all monitors (multi-monitor origin) |
+//! | `logical_to_physical` | Converts logical pixel coordinates to physical pixels using a scale factor |
+//! | `clamp_crop` | Clamps a crop region so it does not exceed monitor boundaries |
+
+use crate::domain::error::{AppError, Result};
+use crate::domain::types::MonitorInfo;
 
 /// Parse a slurp geometry string (`"X,Y WxH"`) into `(x, y, w, h)`.
 ///
@@ -80,7 +91,7 @@ mod tests {
 
     #[test]
     fn test_monitor_origin() {
-        use crate::core::types::{MonitorInfo, ScreenRect};
+        use crate::domain::types::{MonitorInfo, ScreenRect};
         let monitors = vec![
             MonitorInfo {
                 rect: ScreenRect {

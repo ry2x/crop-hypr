@@ -1,3 +1,11 @@
+//! # domain::error
+//!
+//! Application-wide error type `AppError` and `Result<T>` alias.
+//!
+//! `AppError` is implemented via `thiserror::Error` derive. Each variant explicitly names
+//! its origin (command, IPC, configuration, Wayland, etc.).
+//! `exit_code()` maps error variants to UNIX exit codes.
+
 use std::path::PathBuf;
 use thiserror::Error;
 

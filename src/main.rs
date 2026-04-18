@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use hyprcrop::backend::system::{clipboard, notify};
 use hyprcrop::commands::capture;
-use hyprcrop::core::config::Config;
-use hyprcrop::core::error::{AppError, Result};
+use hyprcrop::domain::config::Config;
+use hyprcrop::domain::error::{AppError, Result};
+use hyprcrop::platform::system::{clipboard, notify};
 use hyprcrop::ui::freeze;
 
 #[derive(Parser)]

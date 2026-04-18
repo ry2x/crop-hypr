@@ -1,3 +1,16 @@
+//! # domain::config
+//!
+//! TOML configuration file loading and validation.
+//! All default values are defined here; `Config::load()` reads from
+//! `~/.config/crop-hypr/config.toml` and falls back to defaults if the file is absent.
+//!
+//! ## Key configuration sections
+//!
+//! - `save_path` / `filename_pattern` — output directory and file naming
+//! - `[freeze_glyphs]` / `[freeze_buttons]` — freeze toolbar appearance
+//! - `[freeze_colors]` — overlay, toolbar, and frame colors
+//! - `[notifications]` — enable/disable notifications and icon settings
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -5,7 +18,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::error::{AppError, Result};
+use crate::domain::error::{AppError, Result};
 
 pub mod colors;
 pub use colors::{
@@ -224,7 +237,7 @@ fn normalize_path(path: PathBuf) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::config::freeze::{
+    use crate::domain::config::freeze::{
         default_glyph_all, default_glyph_cancel, default_glyph_crop, default_glyph_monitor,
         default_glyph_size, default_glyph_window,
     };

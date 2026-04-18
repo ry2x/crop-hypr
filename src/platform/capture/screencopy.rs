@@ -7,7 +7,7 @@ use wayland_protocols_wlr::screencopy::v1::client::{
     zwlr_screencopy_frame_v1, zwlr_screencopy_manager_v1,
 };
 
-use crate::core::error::{AppError, Result};
+use crate::domain::error::{AppError, Result};
 use image::{ImageBuffer, Rgba};
 use memmap2::MmapMut;
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
@@ -604,7 +604,7 @@ pub type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
 /// so crop coordinates can be applied directly without coordinate conversion.
 /// HiDPI monitors are downsampled to their logical size during compositing.
 pub fn capture_all_monitors(
-    monitors: &[crate::backend::system::hyprland::MonitorInfo],
+    monitors: &[crate::platform::system::hyprland::MonitorInfo],
 ) -> Result<RgbaImage> {
     Ok(capture_all_monitors_with_physical(monitors)?.1)
 }
@@ -617,7 +617,7 @@ pub fn capture_all_monitors(
 /// same frame, which is critical for the freeze-mode "what you see is what you
 /// save" guarantee.
 pub fn capture_all_monitors_with_physical(
-    monitors: &[crate::backend::system::hyprland::MonitorInfo],
+    monitors: &[crate::platform::system::hyprland::MonitorInfo],
 ) -> Result<(Vec<RgbaImage>, RgbaImage)> {
     if monitors.is_empty() {
         return Err(AppError::Wayland(
@@ -733,9 +733,9 @@ pub fn capture_all_monitors_with_physical(
 /// Region bounds are clamped to image dimensions.
 pub fn crop_and_save(
     img: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>,
-    region: Option<crate::core::types::ScreenRect>,
+    region: Option<crate::domain::types::ScreenRect>,
     dst: &std::path::Path,
-) -> crate::core::error::Result<()> {
+) -> crate::domain::error::Result<()> {
     let cropped = match region {
         None => image::DynamicImage::ImageRgba8(img),
         Some(r) => {
@@ -748,5 +748,5 @@ pub fn crop_and_save(
     };
     cropped
         .save(dst)
-        .map_err(crate::core::error::AppError::from)
+        .map_err(crate::domain::error::AppError::from)
 }

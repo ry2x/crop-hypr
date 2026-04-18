@@ -4,7 +4,7 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::core::config::Notifications;
+use crate::domain::config::Notifications;
 
 pub fn notify_success(path: &Path, config: &Notifications) {
     if !config.enabled {

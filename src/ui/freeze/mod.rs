@@ -1,3 +1,13 @@
+//! # ui::freeze
+//!
+//! Entry point for freeze mode.
+//! Captures all monitors, displays the result as a full-screen overlay,
+//! waits for the user to select a capture region, then crops the frozen
+//! image and saves the final output.
+//!
+//! The `app` submodule implements the iced state machine (`AppState`).
+//! This module orchestrates initialization, execution, and post-processing.
+
 mod app;
 
 pub use app::CaptureMode;
@@ -15,12 +25,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::backend::capture::screencopy;
-use crate::backend::system::hyprland::{self};
-use crate::core::config::Config;
-use crate::core::error::{AppError, Result};
+use crate::domain::config::Config;
+use crate::domain::error::{AppError, Result};
+use crate::platform::capture::screencopy;
+use crate::platform::system::hyprland::{self};
 
-use crate::core::types::ScreenRect;
+use crate::domain::types::ScreenRect;
 
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
@@ -32,7 +42,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
         hyprland::BorderStyle::default()
     };
     let initial_mode =
-        resolve_initial_mode(&cfg.freeze_buttons, crate::core::state::load_last_mode());
+        resolve_initial_mode(&cfg.freeze_buttons, crate::domain::state::load_last_mode());
 
     let monitors_raw = monitors_t
         .join()
@@ -58,7 +68,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     // Compute origin before monitors are moved into Arc.
     // capture_all_monitors places (min_x, min_y) at image pixel (0,0); we need this
     // to translate the UI's global logical coordinates into image coordinates later.
-    let (min_x, min_y) = crate::core::geometry::monitor_origin(&monitors);
+    let (min_x, min_y) = crate::domain::geometry::monitor_origin(&monitors);
 
     // Capture all monitors in a single Wayland session.
     // Using one session guarantees the overlay images and the final-crop source are
@@ -186,7 +196,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
 }
 
 fn resolve_initial_mode(
-    buttons: &crate::core::config::FreezeButtons,
+    buttons: &crate::domain::config::FreezeButtons,
     saved: CaptureMode,
 ) -> CaptureMode {
     // Saved mode may reference a button that has since been disabled.
