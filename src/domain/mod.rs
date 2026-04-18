@@ -1,7 +1,9 @@
 //! # domain
 //!
 //! Domain model shared across the entire application.
-//! Contains no external I/O — only pure data definitions, calculations, and configuration parsing.
+//! Primarily contains pure data definitions, calculations, and configuration parsing, with a
+//! narrow exception for small local persistence in [`state`] to remember the last-used capture
+//! mode across sessions.
 //!
 //! ## Submodules
 //!

@@ -504,8 +504,9 @@ fn extract_image(fi: &FrameInfo) -> Result<RgbaImage> {
         .ok_or_else(|| AppError::Screencopy(format!("format not set for monitor '{}'", fi.name)))?;
     let mut img = ImageBuffer::new(fi.width, fi.height);
     for y in 0..fi.height {
+        let row_offset = y as usize * fi.stride as usize;
         for x in 0..fi.width {
-            let offset = y as usize * fi.stride as usize + x as usize * 4;
+            let offset = row_offset + x as usize * 4;
             img.put_pixel(x, y, read_pixel_rgba(mmap, offset, format));
         }
     }
@@ -628,18 +629,17 @@ pub fn capture_all_monitors_with_physical(
 
     capture_frames(&names, |frames| {
         // All monitors are matched (unmatched check above), so bounding box from monitors is safe.
-        let min_x = monitors.iter().map(|m| m.rect.x).min().unwrap_or_default();
-        let min_y = monitors.iter().map(|m| m.rect.y).min().unwrap_or_default();
-        let max_x = monitors
-            .iter()
-            .map(|m| m.rect.x + m.rect.w)
-            .max()
-            .unwrap_or_default();
-        let max_y = monitors
-            .iter()
-            .map(|m| m.rect.y + m.rect.h)
-            .max()
-            .unwrap_or_default();
+        let (min_x, min_y, max_x, max_y) = monitors.iter().fold(
+            (i32::MAX, i32::MAX, i32::MIN, i32::MIN),
+            |(mx, my, xx, xy), m| {
+                (
+                    mx.min(m.rect.x),
+                    my.min(m.rect.y),
+                    xx.max(m.rect.x + m.rect.w),
+                    xy.max(m.rect.y + m.rect.h),
+                )
+            },
+        );
 
         let total_width = (max_x - min_x).max(0) as u32;
         let total_height = (max_y - min_y).max(0) as u32;
@@ -699,8 +699,9 @@ pub fn capture_all_monitors_with_physical(
                 .collect();
 
             for (ly, &py) in phys_ys.iter().enumerate() {
+                let row_offset = py as usize * fi.stride as usize;
                 for (lx, &px) in phys_xs.iter().enumerate() {
-                    let offset = py as usize * fi.stride as usize + px as usize * 4;
+                    let offset = row_offset + px as usize * 4;
                     master_img.put_pixel(
                         offset_x + lx as u32,
                         offset_y + ly as u32,

@@ -21,22 +21,22 @@ pub struct FreezeGlyphs {
     pub size: f32,
 }
 
-pub fn default_glyph_crop() -> String {
+pub(crate) fn default_glyph_crop() -> String {
     "\u{F019F}".to_string()
 }
-pub fn default_glyph_window() -> String {
+pub(crate) fn default_glyph_window() -> String {
     "\u{EB7F}".to_string()
 }
-pub fn default_glyph_monitor() -> String {
+pub(crate) fn default_glyph_monitor() -> String {
     "\u{F0379}".to_string()
 }
-pub fn default_glyph_all() -> String {
+pub(crate) fn default_glyph_all() -> String {
     "\u{F004C}".to_string()
 }
-pub fn default_glyph_cancel() -> String {
+pub(crate) fn default_glyph_cancel() -> String {
     "\u{F05AD}".to_string()
 }
-pub fn default_glyph_size() -> f32 {
+pub(crate) fn default_glyph_size() -> f32 {
     26.0
 }
 
