@@ -604,9 +604,7 @@ pub type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
 /// The output dimensions and pixel coordinates match what Hyprland IPC and slurp report,
 /// so crop coordinates can be applied directly without coordinate conversion.
 /// HiDPI monitors are downsampled to their logical size during compositing.
-pub fn capture_all_monitors(
-    monitors: &[MonitorInfo],
-) -> Result<RgbaImage> {
+pub fn capture_all_monitors(monitors: &[MonitorInfo]) -> Result<RgbaImage> {
     Ok(capture_all_monitors_with_physical(monitors)?.1)
 }
 
