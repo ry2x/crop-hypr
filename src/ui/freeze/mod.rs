@@ -27,10 +27,9 @@ use std::{
 
 use crate::domain::config::Config;
 use crate::domain::error::{AppError, Result};
+use crate::domain::types::{BorderStyle, ScreenRect};
 use crate::platform::capture::screencopy;
 use crate::platform::system::hyprland::{self};
-
-use crate::domain::types::ScreenRect;
 
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
@@ -39,7 +38,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let border_style = if cfg.capture_window_border {
         hyprland::get_border_style()
     } else {
-        hyprland::BorderStyle::default()
+        BorderStyle::default()
     };
     let initial_mode =
         resolve_initial_mode(&cfg.freeze_buttons, crate::domain::state::load_last_mode());

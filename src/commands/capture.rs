@@ -8,6 +8,7 @@ use crate::domain::error::{AppError, Result};
 use crate::domain::geometry::{
     clamp_crop, logical_to_physical, monitor_origin, parse_slurp_geometry,
 };
+use crate::domain::types::ScreenRect;
 use crate::platform::capture::screencopy;
 use crate::platform::system::cmd::CMD_SLURP;
 use crate::platform::system::hyprland;
@@ -94,7 +95,7 @@ pub fn capture_window(cfg: &Config) -> Result<PathBuf> {
         0
     };
 
-    let win_rect = hyprland::ScreenRect {
+    let win_rect = ScreenRect {
         x: info.at[0],
         y: info.at[1],
         w: info.size[0],

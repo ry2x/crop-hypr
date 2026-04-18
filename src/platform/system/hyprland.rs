@@ -5,7 +5,7 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
 use crate::domain::error::{AppError, Result};
-pub use crate::domain::types::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
+use crate::domain::types::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
