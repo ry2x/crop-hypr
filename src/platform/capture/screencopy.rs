@@ -7,7 +7,8 @@ use wayland_protocols_wlr::screencopy::v1::client::{
     zwlr_screencopy_frame_v1, zwlr_screencopy_manager_v1,
 };
 
-use crate::error::{AppError, Result};
+use crate::domain::error::{AppError, Result};
+use crate::domain::types::{MonitorInfo, ScreenRect};
 use image::{ImageBuffer, Rgba};
 use memmap2::MmapMut;
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
@@ -111,7 +112,7 @@ fn read_pixel_rgba(data: &[u8], offset: usize, format: WEnum<wl_shm::Format>) ->
 /// Initialize a Wayland connection, discover globals, and resolve xdg-output names.
 fn init_wayland() -> Result<(EventQueue<CaptureState>, CaptureState)> {
     let conn = Connection::connect_to_env()
-        .map_err(|_| AppError::Other("Failed to connect to Wayland".to_string()))?;
+        .map_err(|_| AppError::Wayland("Failed to connect to Wayland".to_string()))?;
     let display = conn.display();
     let mut event_queue = conn.new_event_queue();
     let qh = event_queue.handle();
@@ -121,12 +122,12 @@ fn init_wayland() -> Result<(EventQueue<CaptureState>, CaptureState)> {
 
     event_queue
         .roundtrip(&mut state)
-        .map_err(|e| AppError::Other(format!("Wayland roundtrip failed: {e}")))?;
+        .map_err(|e| AppError::Wayland(format!("Wayland roundtrip failed: {e}")))?;
 
     let xdg_mgr = state
         .xdg_output_manager
         .as_ref()
-        .ok_or_else(|| AppError::Other("zxdg_output_manager_v1 not available".to_string()))?
+        .ok_or_else(|| AppError::Wayland("zxdg_output_manager_v1 not available".to_string()))?
         .clone();
 
     for out in &mut state.outputs {
@@ -135,7 +136,7 @@ fn init_wayland() -> Result<(EventQueue<CaptureState>, CaptureState)> {
 
     event_queue
         .roundtrip(&mut state)
-        .map_err(|e| AppError::Other(format!("Wayland roundtrip failed: {e}")))?;
+        .map_err(|e| AppError::Wayland(format!("Wayland roundtrip failed: {e}")))?;
 
     Ok((event_queue, state))
 }
@@ -155,7 +156,7 @@ fn dispatch_until(
     loop {
         event_queue
             .dispatch_pending(state)
-            .map_err(|e| AppError::Other(format!("Wayland dispatch failed: {e}")))?;
+            .map_err(|e| AppError::Wayland(format!("Wayland dispatch failed: {e}")))?;
 
         if done(state) {
             return Ok(());
@@ -163,14 +164,14 @@ fn dispatch_until(
 
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
-            return Err(AppError::Other(
+            return Err(AppError::Wayland(
                 "Screencopy timed out: compositor did not respond in time".to_string(),
             ));
         }
 
         event_queue
             .flush()
-            .map_err(|e| AppError::Other(format!("Wayland flush failed: {e}")))?;
+            .map_err(|e| AppError::Wayland(format!("Wayland flush failed: {e}")))?;
 
         // Prepare a socket read.  Guard and fd are both immutable borrows of event_queue;
         // they coexist safely since Rust allows multiple &self borrows simultaneously.
@@ -492,111 +493,45 @@ impl Dispatch<wl_buffer::WlBuffer, ()> for CaptureState {
 
 // --- Public capture API ---
 
-/// Capture a single monitor at full physical resolution.
-pub fn capture_monitor(monitor_name: &str) -> Result<RgbaImage> {
-    let (mut event_queue, mut state) = init_wayland()?;
-    let qh = event_queue.handle();
-
-    let output = state
-        .outputs
-        .iter()
-        .find(|o| o.name.as_deref() == Some(monitor_name))
-        .ok_or_else(|| AppError::Other(format!("Monitor '{monitor_name}' not found")))?;
-
-    let screencopy_mgr = state
-        .screencopy_manager
+/// Helper to extract physical ImageBuffer from FrameInfo.
+fn extract_image(fi: &FrameInfo) -> Result<RgbaImage> {
+    let mmap = fi
+        .mmap
         .as_ref()
-        .ok_or_else(|| AppError::Other("zwlr_screencopy_manager_v1 not available".to_string()))?;
-
-    let frame = screencopy_mgr.capture_output(0, &output.output, &qh, ());
-    state.frames.push(FrameInfo {
-        frame,
-        width: 0,
-        height: 0,
-        stride: 0,
-        format: None,
-        ready: false,
-        failed: false,
-        error_msg: None,
-        mmap: None,
-        buffer: None,
-        name: monitor_name.to_string(),
-    });
-
-    dispatch_until(&mut event_queue, &mut state, Duration::from_secs(10), |s| {
-        let fi = &s.frames[0];
-        fi.ready || fi.failed
-    })?;
-
-    let fi = &state.frames[0];
-    if fi.failed {
-        return Err(AppError::Other(format!(
-            "Screencopy failed for monitor '{monitor_name}': {}",
-            fi.error_msg.as_deref().unwrap_or("unknown error"),
-        )));
-    }
-
-    let mmap = fi.mmap.as_ref().ok_or_else(|| {
-        AppError::Other("Screencopy buffer missing after ready signal".to_string())
-    })?;
-    let format = fi.format.ok_or_else(|| {
-        AppError::Other("Screencopy format not set after ready signal".to_string())
-    })?;
+        .ok_or_else(|| AppError::Screencopy(format!("buffer missing for monitor '{}'", fi.name)))?;
+    let format = fi
+        .format
+        .ok_or_else(|| AppError::Screencopy(format!("format not set for monitor '{}'", fi.name)))?;
     let mut img = ImageBuffer::new(fi.width, fi.height);
     for y in 0..fi.height {
+        let row_offset = y as usize * fi.stride as usize;
         for x in 0..fi.width {
-            // Compute offset in usize to avoid u32 overflow on large physical buffers.
-            let offset = y as usize * fi.stride as usize + x as usize * 4;
+            let offset = row_offset + x as usize * 4;
             img.put_pixel(x, y, read_pixel_rgba(mmap, offset, format));
         }
     }
     Ok(img)
 }
 
-/// Type alias to reduce verbosity of per-monitor capture return types.
-pub type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
-
-/// Capture all monitors and composite them into a single image in **logical pixel space**.
-///
-/// The output dimensions and pixel coordinates match what Hyprland IPC and slurp report,
-/// so crop coordinates can be applied directly without coordinate conversion.
-/// HiDPI monitors are downsampled to their logical size during compositing.
-pub fn capture_all_monitors(monitors: &[crate::hyprland::MonitorInfo]) -> Result<RgbaImage> {
-    Ok(capture_all_monitors_with_physical(monitors)?.1)
-}
-
-/// Capture all monitors in a **single Wayland session** and return:
-/// - Per-monitor physical-resolution images (in the same order as `monitors`)
-/// - Logical-space composite of all monitors (for crop operations)
-///
-/// Using one session ensures the overlay and the final crop originate from the
-/// same frame, which is critical for the freeze-mode "what you see is what you
-/// save" guarantee.
-pub fn capture_all_monitors_with_physical(
-    monitors: &[crate::hyprland::MonitorInfo],
-) -> Result<(Vec<RgbaImage>, RgbaImage)> {
-    if monitors.is_empty() {
-        return Err(AppError::Other(
-            "No monitors provided to capture".to_string(),
-        ));
-    }
-
+/// Helper to capture a set of outputs and provide the resulting frames to a closure.
+fn capture_frames<F, R>(names: &[&str], f: F) -> Result<R>
+where
+    F: FnOnce(&[FrameInfo]) -> Result<R>,
+{
     let (mut event_queue, mut state) = init_wayland()?;
     let qh = event_queue.handle();
 
     let screencopy_mgr = state
         .screencopy_manager
         .as_ref()
-        .ok_or_else(|| AppError::Other("zwlr_screencopy_manager_v1 not available".to_string()))?;
+        .ok_or_else(|| AppError::Wayland("zwlr_screencopy_manager_v1 not available".to_string()))?;
 
-    // Match every monitor to a Wayland output. Fail if any are missing — a partial
-    // composite would have black regions and incorrect bounding-box geometry.
     let mut unmatched: Vec<&str> = Vec::new();
-    for m in monitors {
+    for &name in names {
         match state
             .outputs
             .iter()
-            .find(|o| o.name.as_deref() == Some(&m.name))
+            .find(|o| o.name.as_deref() == Some(name))
         {
             Some(output) => {
                 let frame = screencopy_mgr.capture_output(0, &output.output, &qh, ());
@@ -611,17 +546,24 @@ pub fn capture_all_monitors_with_physical(
                     error_msg: None,
                     mmap: None,
                     buffer: None,
-                    name: m.name.clone(),
+                    name: name.to_string(),
                 });
             }
-            None => unmatched.push(&m.name),
+            None => unmatched.push(name),
         }
     }
     if !unmatched.is_empty() {
-        return Err(AppError::Other(format!(
-            "No Wayland output found for monitors: {}",
-            unmatched.join(", ")
-        )));
+        if unmatched.len() == 1 {
+            return Err(AppError::Wayland(format!(
+                "Monitor '{}' not found",
+                unmatched[0]
+            )));
+        } else {
+            return Err(AppError::Wayland(format!(
+                "No Wayland output found for monitors: {}",
+                unmatched.join(", ")
+            )));
+        }
     }
 
     dispatch_until(&mut event_queue, &mut state, Duration::from_secs(10), |s| {
@@ -641,129 +583,170 @@ pub fn capture_all_monitors_with_physical(
         })
         .collect();
     if !failures.is_empty() {
-        return Err(AppError::Other(format!(
-            "Screencopy failed for: {}",
+        return Err(AppError::Screencopy(format!(
+            "failed for: {}",
             failures.join(", ")
         )));
     }
 
-    // All monitors are matched (unmatched check above), so bounding box from monitors is safe.
-    let min_x = monitors
-        .iter()
-        .map(|m| m.rect.x)
-        .min()
-        .expect("monitors is non-empty, checked above");
-    let min_y = monitors
-        .iter()
-        .map(|m| m.rect.y)
-        .min()
-        .expect("monitors is non-empty, checked above");
-    let max_x = monitors
-        .iter()
-        .map(|m| m.rect.x + m.rect.w)
-        .max()
-        .expect("monitors is non-empty, checked above");
-    let max_y = monitors
-        .iter()
-        .map(|m| m.rect.y + m.rect.h)
-        .max()
-        .expect("monitors is non-empty, checked above");
+    f(&state.frames)
+}
 
-    let total_width = (max_x - min_x).max(0) as u32;
-    let total_height = (max_y - min_y).max(0) as u32;
-    let mut master_img = ImageBuffer::new(total_width, total_height);
+/// Capture a single monitor at full physical resolution.
+pub fn capture_monitor(monitor_name: &str) -> Result<RgbaImage> {
+    capture_frames(&[monitor_name], |frames| extract_image(&frames[0]))
+}
 
-    // Slot for per-monitor physical images, indexed by position in `monitors`.
-    let mut physical_images: Vec<Option<ImageBuffer<Rgba<u8>, Vec<u8>>>> =
-        vec![None; monitors.len()];
+/// Type alias to reduce verbosity of per-monitor capture return types.
+pub type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
 
-    for fi in &state.frames {
-        let mmap = fi.mmap.as_ref().ok_or_else(|| {
-            AppError::Other(format!(
-                "Screencopy buffer missing for monitor '{}'",
-                fi.name
-            ))
-        })?;
-        let format = fi.format.ok_or_else(|| {
-            AppError::Other(format!(
-                "Screencopy format not set for monitor '{}'",
-                fi.name
-            ))
-        })?;
-        let (mon_idx, mon_info) = monitors
-            .iter()
-            .enumerate()
-            .find(|(_, m)| m.name == fi.name)
-            .ok_or_else(|| AppError::Other(format!("Monitor info missing for '{}'", fi.name)))?;
+/// Capture all monitors and composite them into a single image in **logical pixel space**.
+///
+/// The output dimensions and pixel coordinates match what Hyprland IPC and slurp report,
+/// so crop coordinates can be applied directly without coordinate conversion.
+/// HiDPI monitors are downsampled to their logical size during compositing.
+pub fn capture_all_monitors(monitors: &[MonitorInfo]) -> Result<RgbaImage> {
+    Ok(capture_all_monitors_with_physical(monitors)?.1)
+}
 
-        // --- Physical-resolution image (for HiDPI overlay) ---
-        let mut phys_img = ImageBuffer::new(fi.width, fi.height);
-        for y in 0..fi.height {
-            for x in 0..fi.width {
-                let offset = y as usize * fi.stride as usize + x as usize * 4;
-                phys_img.put_pixel(x, y, read_pixel_rgba(mmap, offset, format));
-            }
-        }
-        physical_images[mon_idx] = Some(phys_img);
-
-        // --- Logical-space composite ---
-        let offset_x = (mon_info.rect.x - min_x) as u32;
-        let offset_y = (mon_info.rect.y - min_y) as u32;
-        let log_w = mon_info.rect.w;
-        let log_h = mon_info.rect.h;
-
-        if log_w <= 0 || log_h <= 0 {
-            return Err(AppError::Other(format!(
-                "Monitor '{}' has invalid dimensions ({}x{}) in Hyprland IPC data",
-                mon_info.name, log_w, log_h
-            )));
-        }
-        let log_w = log_w as u32;
-        let log_h = log_h as u32;
-
-        // Pre-compute the logical→physical index mapping for each axis.
-        // Use u64 intermediate to avoid u32 overflow when logical * physical dimensions
-        // exceed 4 GiB (possible on large multi-monitor HiDPI setups).
-        // Pre-computing avoids repeating the division for every pixel in the hot loop.
-        let phys_xs: Vec<u32> = (0..log_w)
-            .map(|lx| {
-                ((lx as u64 * fi.width as u64 / log_w as u64) as u32)
-                    .min(fi.width.saturating_sub(1))
-            })
-            .collect();
-        let phys_ys: Vec<u32> = (0..log_h)
-            .map(|ly| {
-                ((ly as u64 * fi.height as u64 / log_h as u64) as u32)
-                    .min(fi.height.saturating_sub(1))
-            })
-            .collect();
-
-        for (ly, &py) in phys_ys.iter().enumerate() {
-            for (lx, &px) in phys_xs.iter().enumerate() {
-                // Compute offset in usize to avoid u32 overflow on large physical buffers.
-                let offset = py as usize * fi.stride as usize + px as usize * 4;
-                // lx < log_w (u32) and ly < log_h (u32), so usize → u32 never truncates.
-                master_img.put_pixel(
-                    offset_x + lx as u32,
-                    offset_y + ly as u32,
-                    read_pixel_rgba(mmap, offset, format),
-                );
-            }
-        }
+/// Capture all monitors in a **single Wayland session** and return:
+/// - Per-monitor physical-resolution images (in the same order as `monitors`)
+/// - Logical-space composite of all monitors (for crop operations)
+///
+/// Using one session ensures the overlay and the final crop originate from the
+/// same frame, which is critical for the freeze-mode "what you see is what you
+/// save" guarantee.
+pub fn capture_all_monitors_with_physical(
+    monitors: &[MonitorInfo],
+) -> Result<(Vec<RgbaImage>, RgbaImage)> {
+    if monitors.is_empty() {
+        return Err(AppError::Wayland(
+            "No monitors provided to capture".to_string(),
+        ));
     }
 
-    let physical_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>> = physical_images
-        .into_iter()
-        .enumerate()
-        .map(|(i, opt)| {
-            opt.ok_or_else(|| {
-                AppError::Other(format!(
-                    "Physical image missing for monitor '{}'",
-                    monitors[i].name
-                ))
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let names: Vec<&str> = monitors.iter().map(|m| m.name.as_str()).collect();
 
-    Ok((physical_images, master_img))
+    capture_frames(&names, |frames| {
+        // All monitors are matched (unmatched check above), so bounding box from monitors is safe.
+        let (min_x, min_y, max_x, max_y) = monitors.iter().fold(
+            (i32::MAX, i32::MAX, i32::MIN, i32::MIN),
+            |(mx, my, xx, xy), m| {
+                (
+                    mx.min(m.rect.x),
+                    my.min(m.rect.y),
+                    xx.max(m.rect.x + m.rect.w),
+                    xy.max(m.rect.y + m.rect.h),
+                )
+            },
+        );
+
+        let total_width = (max_x - min_x).max(0) as u32;
+        let total_height = (max_y - min_y).max(0) as u32;
+        let mut master_img = ImageBuffer::new(total_width, total_height);
+
+        // Slot for per-monitor physical images, indexed by position in `monitors`.
+        let mut physical_images: Vec<Option<RgbaImage>> = vec![None; monitors.len()];
+
+        for fi in frames {
+            let (mon_idx, mon_info) = monitors
+                .iter()
+                .enumerate()
+                .find(|(_, m)| m.name == fi.name)
+                .ok_or_else(|| {
+                    AppError::Wayland(format!("Monitor info missing for '{}'", fi.name))
+                })?;
+
+            // --- Physical-resolution image (for HiDPI overlay) ---
+            let phys_img = extract_image(fi)?;
+            physical_images[mon_idx] = Some(phys_img);
+
+            let mmap = fi
+                .mmap
+                .as_ref()
+                .ok_or_else(|| AppError::Screencopy("buffer missing".to_string()))?;
+            let format = fi
+                .format
+                .ok_or_else(|| AppError::Screencopy("format not set".to_string()))?;
+
+            // --- Logical-space composite ---
+            let offset_x = (mon_info.rect.x - min_x) as u32;
+            let offset_y = (mon_info.rect.y - min_y) as u32;
+            let log_w = mon_info.rect.w;
+            let log_h = mon_info.rect.h;
+
+            if log_w <= 0 || log_h <= 0 {
+                return Err(AppError::Wayland(format!(
+                    "Monitor '{}' has invalid dimensions ({}x{}) in Hyprland IPC data",
+                    mon_info.name, log_w, log_h
+                )));
+            }
+            let log_w = log_w as u32;
+            let log_h = log_h as u32;
+
+            // Pre-compute the logical→physical index mapping for each axis.
+            let phys_xs: Vec<u32> = (0..log_w)
+                .map(|lx| {
+                    ((lx as u64 * fi.width as u64 / log_w as u64) as u32)
+                        .min(fi.width.saturating_sub(1))
+                })
+                .collect();
+            let phys_ys: Vec<u32> = (0..log_h)
+                .map(|ly| {
+                    ((ly as u64 * fi.height as u64 / log_h as u64) as u32)
+                        .min(fi.height.saturating_sub(1))
+                })
+                .collect();
+
+            for (ly, &py) in phys_ys.iter().enumerate() {
+                let row_offset = py as usize * fi.stride as usize;
+                for (lx, &px) in phys_xs.iter().enumerate() {
+                    let offset = row_offset + px as usize * 4;
+                    master_img.put_pixel(
+                        offset_x + lx as u32,
+                        offset_y + ly as u32,
+                        read_pixel_rgba(mmap, offset, format),
+                    );
+                }
+            }
+        }
+
+        let physical_images: Vec<RgbaImage> = physical_images
+            .into_iter()
+            .enumerate()
+            .map(|(i, opt)| {
+                opt.ok_or_else(|| {
+                    AppError::Wayland(format!(
+                        "Physical image missing for monitor '{}'",
+                        monitors[i].name
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok((physical_images, master_img))
+    })
+}
+
+/// Crop an RGBA image buffer to an optional region and save to `dst`.
+/// If `region` is `None`, saves the full image as-is.
+/// Region bounds are clamped to image dimensions.
+pub fn crop_and_save(
+    img: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>,
+    region: Option<ScreenRect>,
+    dst: &std::path::Path,
+) -> Result<()> {
+    let cropped = match region {
+        None => image::DynamicImage::ImageRgba8(img),
+        Some(r) => {
+            let x = r.x.max(0) as u32;
+            let y = r.y.max(0) as u32;
+            let w = (r.w as u32).min(img.width().saturating_sub(x));
+            let h = (r.h as u32).min(img.height().saturating_sub(y));
+            image::DynamicImage::ImageRgba8(image::imageops::crop_imm(&img, x, y, w, h).to_image())
+        }
+    };
+    cropped
+        .save(dst)
+        .map_err(crate::domain::error::AppError::from)
 }

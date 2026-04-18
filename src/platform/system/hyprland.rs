@@ -4,45 +4,8 @@ use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
-use crate::error::{AppError, Result};
-
-#[derive(Debug, Clone, Copy, Deserialize)]
-pub struct ScreenRect {
-    pub x: i32,
-    pub y: i32,
-    pub w: i32,
-    pub h: i32,
-}
-
-impl ScreenRect {
-    /// Expand the rect outward by `border_size` on every side (in logical pixels).
-    pub fn expand(self, border_size: u32) -> Self {
-        let b = border_size as i32;
-        Self {
-            x: self.x - b,
-            y: self.y - b,
-            w: self.w + 2 * b,
-            h: self.h + 2 * b,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct WindowInfo {
-    pub rect: ScreenRect,
-    pub title: String,
-    pub floating: bool,
-    /// Lower = more recently focused (0 = topmost floating window).
-    pub focus_history_id: i64,
-}
-
-#[derive(Debug, Clone)]
-pub struct MonitorInfo {
-    pub rect: ScreenRect,
-    pub name: String,
-    pub focused: bool,
-    pub active_workspace_id: i64,
-}
+use crate::domain::error::{AppError, Result};
+use crate::domain::types::{BorderStyle, LayerSurface, MonitorInfo, ScreenRect, WindowInfo};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -113,21 +76,13 @@ pub fn hyprland_ipc_raw(cmd: &str) -> Result<Vec<u8>> {
 pub fn hyprland_ipc<T: for<'de> Deserialize<'de>>(cmd: &str) -> Result<T> {
     let buf = hyprland_ipc_raw(cmd)?;
     let parsed: T =
-        serde_json::from_slice(&buf).map_err(|e| AppError::HyprlandJson(cmd.to_string(), e))?;
+        serde_json::from_slice(&buf).map_err(|e| AppError::JsonParse(cmd.to_string(), e))?;
     Ok(parsed)
 }
 
 #[derive(Deserialize, Debug)]
 pub struct HyprOption {
     pub int: i64,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct BorderStyle {
-    /// Hyprland `general:border_size` in logical pixels.
-    pub border_size: u32,
-    /// Hyprland `decoration:rounding` in logical pixels.
-    pub rounding: u32,
 }
 
 /// Fetch `general:border_size` and `decoration:rounding` from Hyprland IPC.
@@ -171,13 +126,6 @@ struct HyprLayerSurface {
 #[derive(Deserialize, Debug)]
 pub(crate) struct HyprLayerMonitor {
     levels: HashMap<String, Vec<HyprLayerSurface>>,
-}
-
-/// A Wayland layer-shell surface at overlay level (level 3).
-#[derive(Debug, Clone)]
-pub struct LayerSurface {
-    pub rect: ScreenRect,
-    pub namespace: String,
 }
 
 /// Hyprland layer level for overlay surfaces (above all windows).

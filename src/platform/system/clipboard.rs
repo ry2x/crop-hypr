@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::cmd::{CMD_WL_COPY, run_cmd_status_with_stdin};
-use crate::error::{AppError, Result};
+use crate::domain::error::{AppError, Result};
+use crate::platform::system::cmd::{CMD_WL_COPY, run_cmd_status_with_stdin};
 
 pub fn copy_to_clipboard(path: &Path) -> Result<()> {
     let file =

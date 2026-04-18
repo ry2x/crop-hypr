@@ -1,6 +1,27 @@
+//! # domain::state
+//!
+//! Persists the last-used capture mode (`CaptureMode`) for freeze mode across sessions.
+//!
+//! Storage path: `$XDG_STATE_HOME/hyprcrop/last_mode` (fallback: `~/.local/state/hyprcrop/last_mode`)
+//!
+//! `CaptureMode::All` is excluded from persistence — it fires immediately on press,
+//! so there is no meaningful "last interactive mode" to remember.
+//! Missing, unreadable, or unrecognized values fall back to `CaptureMode::Crop`.
+
 use std::{fs, path::PathBuf};
 
-use crate::freeze::CaptureMode;
+// ── CaptureMode ───────────────────────────────────────────────────────────────
+
+/// The active capture mode in the freeze-mode overlay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureMode {
+    Crop,
+    Window,
+    Monitor,
+    All,
+}
+
+// ── State persistence ─────────────────────────────────────────────────────────
 
 /// Returns `$XDG_STATE_HOME/hyprcrop/last_mode`
 /// (falls back to `~/.local/state/hyprcrop/last_mode`).

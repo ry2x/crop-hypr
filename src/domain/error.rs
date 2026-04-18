@@ -1,3 +1,11 @@
+//! # domain::error
+//!
+//! Application-wide error type `AppError` and `Result<T>` alias.
+//!
+//! `AppError` is implemented via `thiserror::Error` derive. Each variant explicitly names
+//! its origin (command, IPC, configuration, Wayland, etc.).
+//! `exit_code()` maps error variants to UNIX exit codes.
+
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -15,11 +23,8 @@ pub enum AppError {
     #[error("Hyprland IPC environment variable {0} error: {1}")]
     HyprlandEnvVar(&'static str, #[source] std::env::VarError),
 
-    #[error("Failed to parse JSON from {0}: {1}")]
-    HyprlandJson(String, #[source] serde_json::Error),
-
-    #[error("Failed to parse JSON: {0}")]
-    JsonParse(#[from] serde_json::Error),
+    #[error("JSON parse error in {0}: {1}")]
+    JsonParse(String, #[source] serde_json::Error),
 
     #[error("Invalid configuration: {0}")]
     Config(String),
@@ -41,6 +46,12 @@ pub enum AppError {
 
     #[error("Iced Layershell error: {0}")]
     LayerShell(String),
+
+    #[error("Wayland error: {0}")]
+    Wayland(String),
+
+    #[error("Screencopy failed: {0}")]
+    Screencopy(String),
 
     #[error("File system error on path {0}: {1}")]
     FileSystem(PathBuf, #[source] std::io::Error),

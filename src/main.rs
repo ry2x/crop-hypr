@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use hyprcrop::config::Config;
-use hyprcrop::error::{AppError, Result};
-use hyprcrop::{capture, clipboard, freeze, notify};
+use hyprcrop::commands::capture;
+use hyprcrop::domain::config::Config;
+use hyprcrop::domain::error::{AppError, Result};
+use hyprcrop::platform::system::{clipboard, notify};
+use hyprcrop::ui::freeze;
 
 #[derive(Parser)]
 #[command(name = "hyprcrop", about = "Hyprland screenshot tool", version)]

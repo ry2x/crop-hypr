@@ -1,3 +1,13 @@
+//! # ui::freeze
+//!
+//! Entry point for freeze mode.
+//! Captures all monitors, displays the result as a full-screen overlay,
+//! waits for the user to select a capture region, then crops the frozen
+//! image and saves the final output.
+//!
+//! The `app` submodule implements the iced state machine (`AppState`).
+//! This module orchestrates initialization, execution, and post-processing.
+
 mod app;
 
 pub use app::CaptureMode;
@@ -15,11 +25,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::config::Config;
-use crate::error::{AppError, Result};
-use crate::freeze_state;
-use crate::hyprland::{self, ScreenRect};
-use crate::screencopy;
+use crate::domain::config::Config;
+use crate::domain::error::{AppError, Result};
+use crate::domain::types::{BorderStyle, ScreenRect};
+use crate::platform::capture::screencopy;
+use crate::platform::system::hyprland::{self};
 
 pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let monitors_t = std::thread::spawn(hyprland::get_monitors);
@@ -28,9 +38,10 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     let border_style = if cfg.capture_window_border {
         hyprland::get_border_style()
     } else {
-        hyprland::BorderStyle::default()
+        BorderStyle::default()
     };
-    let initial_mode = resolve_initial_mode(&cfg.freeze_buttons, freeze_state::load_last_mode());
+    let initial_mode =
+        resolve_initial_mode(&cfg.freeze_buttons, crate::domain::state::load_last_mode());
 
     let monitors_raw = monitors_t
         .join()
@@ -56,8 +67,7 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
     // Compute origin before monitors are moved into Arc.
     // capture_all_monitors places (min_x, min_y) at image pixel (0,0); we need this
     // to translate the UI's global logical coordinates into image coordinates later.
-    let min_x = monitors.iter().map(|m| m.rect.x).min().unwrap_or(0);
-    let min_y = monitors.iter().map(|m| m.rect.y).min().unwrap_or(0);
+    let (min_x, min_y) = crate::domain::geometry::monitor_origin(&monitors);
 
     // Capture all monitors in a single Wayland session.
     // Using one session guarantees the overlay images and the final-crop source are
@@ -178,13 +188,16 @@ pub fn run_freeze(cfg: &Config) -> Result<PathBuf> {
                 w: r.w,
                 h: r.h,
             });
-            crop_and_save(full_rgba, adjusted, &out_path)?;
+            screencopy::crop_and_save(full_rgba, adjusted, &out_path)?;
             Ok(out_path)
         }
     }
 }
 
-fn resolve_initial_mode(buttons: &crate::config::FreezeButtons, saved: CaptureMode) -> CaptureMode {
+fn resolve_initial_mode(
+    buttons: &crate::domain::config::FreezeButtons,
+    saved: CaptureMode,
+) -> CaptureMode {
     // Saved mode may reference a button that has since been disabled.
     // Fall back to the first enabled mode so the UI starts in a valid state.
     let saved_enabled = match saved {
@@ -209,25 +222,4 @@ fn resolve_initial_mode(buttons: &crate::config::FreezeButtons, saved: CaptureMo
         // toolbar is hidden or cancel-only.
         CaptureMode::Crop
     }
-}
-
-fn crop_and_save(
-    img: ::image::ImageBuffer<::image::Rgba<u8>, Vec<u8>>,
-    region: Option<ScreenRect>,
-    dst: &std::path::Path,
-) -> Result<()> {
-    let cropped = match region {
-        None => ::image::DynamicImage::ImageRgba8(img),
-        Some(r) => {
-            let x = r.x.max(0) as u32;
-            let y = r.y.max(0) as u32;
-            let w = (r.w as u32).min(img.width().saturating_sub(x));
-            let h = (r.h as u32).min(img.height().saturating_sub(y));
-            ::image::DynamicImage::ImageRgba8(
-                ::image::imageops::crop_imm(&img, x, y, w, h).to_image(),
-            )
-        }
-    };
-
-    cropped.save(dst).map_err(AppError::from)
 }
